@@ -237,65 +237,25 @@ WinMain(
             0,
             computedBuffer.handle
         );
-
-        {
-            VkCommandBuffer cmd = allocateCommandBuffer(vk.device, vk.cmdPoolComputeTransient);
-            beginOneOffCommandBuffer(cmd);
-            vkCmdBindPipeline(
-                cmd,
-                VK_PIPELINE_BIND_POINT_COMPUTE,
-                pipeline.handle
-            );
-            vkCmdBindDescriptorSets(
-                cmd,
-                VK_PIPELINE_BIND_POINT_COMPUTE,
-                pipeline.layout,
-                0, 1, &pipeline.descriptorSet,
-                0, nullptr
-            );
-            vkCmdDispatch(
-                cmd,
-                1,
-                1,
-                1
-            );
-            endCommandBuffer(cmd);
-            submitCommandBuffer(cmd, vk.computeQueue);
-            // Might as well wait here since there will be nothing to display
-            // otherwise.
-            vkQueueWaitIdle(vk.computeQueue);
-        }
+        dispatchCompute(
+            vk,
+            pipeline,
+            1, 1, 1
+        );
+        // Have to wait here before we transfer ownership of the buffer.
+        vkQueueWaitIdle(vk.computeQueue);
 
         // TODO: Record these and submit them in one.
-        VkBufferMemoryBarrier barrier = {};
-        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barrier.pNext = nullptr;
-        barrier.buffer = computedBuffer.handle;
-        barrier.offset = 0;
-        barrier.size = VK_WHOLE_SIZE;
-        barrier.srcQueueFamilyIndex = vk.computeQueueFamily;
-        barrier.dstQueueFamilyIndex = vk.queueFamily;
-        barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        barrier.dstAccessMask = 0;
-
-        {
-            VkCommandBuffer cmd = allocateCommandBuffer(vk.device, vk.cmdPoolComputeTransient);
-            beginOneOffCommandBuffer(cmd);
-            vkCmdPipelineBarrier(
-                cmd,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                0,
-                0, nullptr,
-                1, &barrier,
-                0, nullptr
-            );
-            endCommandBuffer(cmd);
-            submitCommandBuffer(cmd, vk.computeQueue);
-            // Might as well wait here since there will be nothing to display
-            // otherwise.
-            vkQueueWaitIdle(vk.computeQueue);
-        }
+        transferBufferOwnership(
+            vk.device,
+            vk.cmdPoolComputeTransient,
+            vk.computeQueue,
+            computedBuffer.handle,
+            vk.computeQueueFamily,
+            vk.queueFamily,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
+        );
     }
 
     // Transfer buffer ownership
