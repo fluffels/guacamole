@@ -244,7 +244,7 @@ WinMain(
         );
         // Have to wait here before we transfer ownership of the buffer.
         vkQueueWaitIdle(vk.computeQueue);
-        transferBufferOwnership(
+        releaseBufferOwnership(
             vk.device,
             vk.cmdPoolComputeTransient,
             vk.computeQueue,
@@ -254,56 +254,15 @@ WinMain(
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
         );
-    }
-
-    // Transfer buffer ownership
-    {
-        VkBufferMemoryBarrier barrier = {};
-        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barrier.pNext = nullptr;
-        barrier.buffer = computedBuffer.handle;
-        barrier.offset = 0;
-        barrier.size = VK_WHOLE_SIZE;
-        barrier.srcQueueFamilyIndex = vk.computeQueueFamily;
-        barrier.dstQueueFamilyIndex = vk.queueFamily;
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        VkCommandBuffer cmd = {};
-        createCommandBuffers(
+        acceptBufferOwnership(
             vk.device,
             vk.cmdPoolTransient,
-            1,
-            &cmd
-        );
-        beginCommandBuffer(cmd, 0);
-        vkCmdPipelineBarrier(
-            cmd,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-            0,
-            0, nullptr,
-            1, &barrier,
-            0, nullptr
-        );
-        endCommandBuffer(cmd);
-
-        VkSubmitInfo submit = {};
-        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submit.pNext = nullptr;
-        submit.commandBufferCount = 1;
-        submit.pCommandBuffers = &cmd;
-        submit.signalSemaphoreCount = 0;
-        submit.pSignalSemaphores = nullptr;
-        submit.waitSemaphoreCount = 0;
-        submit.pWaitSemaphores = 0;
-        submit.pWaitDstStageMask = nullptr;
-
-        vkQueueSubmit(
             vk.queue,
-            1,
-            &submit,
-            VK_NULL_HANDLE
+            computedBuffer.handle,
+            vk.computeQueueFamily,
+            vk.queueFamily,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
         );
     }
 
