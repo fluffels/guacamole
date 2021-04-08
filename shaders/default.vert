@@ -7,5 +7,9 @@
 layout(location=0) in vec3 inPosition;
 
 void main() {
-    gl_Position = vec4(inPosition, 1);
+    vec4 p = vec4(inPosition, 1);
+    p -= uniforms.eye;
+    p = rotate_vertex_position(uniforms.rotation, p);
+    p = uniforms.proj * p;
+    gl_Position = p;
 }

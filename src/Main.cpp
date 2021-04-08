@@ -146,6 +146,8 @@ WinMain(
     }
 
     // NOTE: Create window.
+    int screenWidth;
+    int screenHeight;
     HWND window = NULL;
     {
         WNDCLASSEX windowClassProperties = {};
@@ -173,13 +175,15 @@ WinMain(
         );
         CHECK(window, "Could not create window");
 
+        screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        screenHeight = GetSystemMetrics(SM_CYSCREEN);
         SetWindowPos(
             window,
             HWND_TOP,
             0,
             0,
-            GetSystemMetrics(SM_CXSCREEN),
-            GetSystemMetrics(SM_CYSCREEN),
+            screenWidth,
+            screenHeight,
             SWP_FRAMECHANGED
         );
         ShowCursor(FALSE);
@@ -267,6 +271,12 @@ WinMain(
             "default",
             defaultPipeline
         );
+        updateUniformBuffer(
+            vk.device,
+            defaultPipeline.descriptorSet,
+            0,
+            vk.uniforms.handle
+        );
 
         u32 framebufferCount = vk.swap.images.size();
         arrsetlen(cmds, framebufferCount);
@@ -326,10 +336,33 @@ WinMain(
         }
     }
 
+    // Initialize DirectInput.
+    DirectInput directInput(instance);
+    auto mouse = directInput.mouse;
+    auto controller = directInput.controller;
+
+    // Initialize state.
+    float rotY = 0;
+    float rotX = 0;
+    Uniforms uniforms = {};
+    matrixProjection(
+        screenWidth,
+        screenHeight,
+        toRadians(45.f),
+        10.f, .1f,
+        uniforms.proj
+    );
+    uniforms.eye.z = -2.f;
+
     // Main loop.
+    LARGE_INTEGER frameStart = {};
+    LARGE_INTEGER frameEnd = {};
+    i64 frameDelta = 0;
     BOOL done = false;
     int errorCode = 0;
     while (!done) {
+        QueryPerformanceCounter(&frameStart);
+
         MSG msg;
         BOOL messageAvailable; 
         do {
@@ -346,6 +379,37 @@ WinMain(
             }
             DispatchMessage(&msg); 
         } while(!done && messageAvailable);
+        
+        // Frame rate independent movement stuff.
+        QueryPerformanceCounter(&frameEnd);
+        float frameTime = (frameEnd.QuadPart - frameStart.QuadPart) /
+            (float)counterFrequency.QuadPart;
+        float moveDelta = DELTA_MOVE_PER_S * frameTime;
+
+        // Keyboard.
+        if (keyboard['W']) {
+            moveAlongQuaternion(moveDelta, uniforms.rotation, uniforms.eye);
+        }
+        if (keyboard['S']) {
+            moveAlongQuaternion(-moveDelta, uniforms.rotation, uniforms.eye);
+        }
+        if (keyboard['A']) {
+            movePerpendicularToQuaternion(-moveDelta, uniforms.rotation, uniforms.eye);
+        }
+        if (keyboard['D']) {
+            movePerpendicularToQuaternion(moveDelta, uniforms.rotation, uniforms.eye);
+        }
+
+        // Mouse.
+        Vec2i mouseDelta = mouse->getDelta();
+        auto mouseDeltaX = mouseDelta.x * MOUSE_SENSITIVITY;
+        rotY -= mouseDeltaX;
+        auto mouseDeltaY = mouseDelta.y * MOUSE_SENSITIVITY;
+        rotX += mouseDeltaY;
+        quaternionInit(uniforms.rotation);
+        rotateQuaternionY(rotY, uniforms.rotation);
+        rotateQuaternionX(rotX, uniforms.rotation);
+        updateUniforms(vk, &uniforms, sizeof(uniforms));
 
         // Render frame.
         present(vk, cmds, 1);
