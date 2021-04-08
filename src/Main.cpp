@@ -238,58 +238,33 @@ WinMain(
             computedBuffer.handle
         );
 
-        VkCommandBuffer cmd = allocateCommandBuffer(vk.device, vk.cmdPoolComputeTransient);
-
-        VkCommandBufferBeginInfo begin = {};
-        begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin.pNext = nullptr;
-        begin.flags = 0;
-        begin.pInheritanceInfo = nullptr;
-        vkBeginCommandBuffer(cmd, &begin);
-
-        vkCmdBindPipeline(
-            cmd,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            pipeline.handle
-        );
-        vkCmdBindDescriptorSets(
-            cmd,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            pipeline.layout,
-            0, 1, &pipeline.descriptorSet,
-            0, nullptr
-        );
-
-        vkCmdDispatch(
-            cmd,
-            1,
-            1,
-            1
-        );
-
-        vkEndCommandBuffer(cmd);
-
-        VkSubmitInfo submit = {};
-        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submit.pNext = nullptr;
-        submit.commandBufferCount = 1;
-        submit.pCommandBuffers = &cmd;
-        submit.signalSemaphoreCount = 0;
-        submit.pSignalSemaphores = nullptr;
-        submit.waitSemaphoreCount = 0;
-        submit.pWaitSemaphores = 0;
-        submit.pWaitDstStageMask = nullptr;
-
-        vkQueueSubmit(
-            vk.computeQueue,
-            1,
-            &submit,
-            VK_NULL_HANDLE
-        );
-
-        // Might as well wait here since there will be nothing to display
-        // otherwise.
-        vkQueueWaitIdle(vk.computeQueue);
+        {
+            VkCommandBuffer cmd = allocateCommandBuffer(vk.device, vk.cmdPoolComputeTransient);
+            beginOneOffCommandBuffer(cmd);
+            vkCmdBindPipeline(
+                cmd,
+                VK_PIPELINE_BIND_POINT_COMPUTE,
+                pipeline.handle
+            );
+            vkCmdBindDescriptorSets(
+                cmd,
+                VK_PIPELINE_BIND_POINT_COMPUTE,
+                pipeline.layout,
+                0, 1, &pipeline.descriptorSet,
+                0, nullptr
+            );
+            vkCmdDispatch(
+                cmd,
+                1,
+                1,
+                1
+            );
+            endCommandBuffer(cmd);
+            submitCommandBuffer(cmd, vk.computeQueue);
+            // Might as well wait here since there will be nothing to display
+            // otherwise.
+            vkQueueWaitIdle(vk.computeQueue);
+        }
 
         // TODO: Record these and submit them in one.
         VkBufferMemoryBarrier barrier = {};
@@ -303,28 +278,24 @@ WinMain(
         barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         barrier.dstAccessMask = 0;
 
-        vkBeginCommandBuffer(cmd, &begin);
-        vkCmdPipelineBarrier(
-            cmd,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-            0,
-            0, nullptr,
-            1, &barrier,
-            0, nullptr
-        );
-        vkEndCommandBuffer(cmd);
-
-        vkQueueSubmit(
-            vk.computeQueue,
-            1,
-            &submit,
-            VK_NULL_HANDLE
-        );
-
-        // Might as well wait here since there will be nothing to display
-        // otherwise.
-        vkQueueWaitIdle(vk.computeQueue);
+        {
+            VkCommandBuffer cmd = allocateCommandBuffer(vk.device, vk.cmdPoolComputeTransient);
+            beginOneOffCommandBuffer(cmd);
+            vkCmdPipelineBarrier(
+                cmd,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                0,
+                0, nullptr,
+                1, &barrier,
+                0, nullptr
+            );
+            endCommandBuffer(cmd);
+            submitCommandBuffer(cmd, vk.computeQueue);
+            // Might as well wait here since there will be nothing to display
+            // otherwise.
+            vkQueueWaitIdle(vk.computeQueue);
+        }
     }
 
     // Transfer buffer ownership
