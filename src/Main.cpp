@@ -238,20 +238,7 @@ WinMain(
             computedBuffer.handle
         );
 
-        VkCommandBuffer cmd = {};
-        {
-            VkCommandBufferAllocateInfo allocate = {};
-            allocate.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            allocate.pNext = nullptr;
-            allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-            allocate.commandPool = vk.cmdPoolComputeTransient;
-            allocate.commandBufferCount = 1;
-            vkAllocateCommandBuffers(
-                vk.device,
-                &allocate,
-                &cmd
-            );
-        }
+        VkCommandBuffer cmd = allocateCommandBuffer(vk.device, vk.cmdPoolComputeTransient);
 
         VkCommandBufferBeginInfo begin = {};
         begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
