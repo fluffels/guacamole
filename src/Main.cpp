@@ -347,10 +347,6 @@ WinMain(
             DispatchMessage(&msg); 
         } while(!done && messageAvailable);
 
-        if (done) {
-            break;
-        }
-
         // Render frame.
         present(vk, cmds, 1);
     }
