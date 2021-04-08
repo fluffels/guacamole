@@ -244,19 +244,11 @@ WinMain(
         );
         // Have to wait here before we transfer ownership of the buffer.
         vkQueueWaitIdle(vk.computeQueue);
-        releaseBufferOwnership(
+        transferBufferOwnership(
             vk.device,
             vk.cmdPoolComputeTransient,
-            vk.computeQueue,
-            computedBuffer.handle,
-            vk.computeQueueFamily,
-            vk.queueFamily,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
-        );
-        acceptBufferOwnership(
-            vk.device,
             vk.cmdPoolTransient,
+            vk.computeQueue,
             vk.queue,
             computedBuffer.handle,
             vk.computeQueueFamily,
