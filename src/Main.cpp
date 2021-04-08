@@ -244,8 +244,6 @@ WinMain(
         );
         // Have to wait here before we transfer ownership of the buffer.
         vkQueueWaitIdle(vk.computeQueue);
-
-        // TODO: Record these and submit them in one.
         transferBufferOwnership(
             vk.device,
             vk.cmdPoolComputeTransient,
