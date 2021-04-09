@@ -4,10 +4,10 @@
 #include "quaternions.glsl"
 #include "uniforms.glsl"
 
-layout(location=0) in vec3 inPosition;
+layout(location=0) in vec4 inPosition;
 
 void main() {
-    vec4 p = vec4(inPosition, 1);
+    vec4 p = inPosition;
     p -= uniforms.eye;
     p = rotate_vertex_position(uniforms.rotation, p);
     p = uniforms.proj * p;
