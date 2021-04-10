@@ -220,7 +220,9 @@ WinMain(
 
     // Init & execute compute shader.
     VulkanBuffer computedBuffer;
-    const int computeSize = 16 * 4 * 4;
+    const u32 computedVertexCount = 16;
+    const u32 computedVertexWidth = 4;
+    const int computeSize = computedVertexCount * computedVertexWidth * sizeof(float);
     {
         VulkanPipeline pipeline;
         initVKPipelineCompute(
@@ -324,7 +326,7 @@ WinMain(
             );
             vkCmdDraw(
                 cmd,
-                16,
+                computedVertexCount,
                 1,
                 0,
                 0
