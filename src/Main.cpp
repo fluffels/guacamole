@@ -220,7 +220,12 @@ WinMain(
 
     // Init & execute compute shader.
     VulkanBuffer computedBuffer;
-    const u32 computedVertexCount = 16;
+    const u32 computeWidth = 32;
+    const u32 computeHeight = computeWidth;
+    const u32 computeDepth = computeWidth;
+    const u32 computeCount = computeWidth * computeHeight * computeDepth;
+    const u32 computeVerticesPerExecution = 15;
+    const u32 computedVertexCount = computeVerticesPerExecution * computeCount;
     const u32 computedVertexWidth = 4;
     const int computeSize = computedVertexCount * computedVertexWidth * sizeof(float);
     {
@@ -246,7 +251,7 @@ WinMain(
         dispatchCompute(
             vk,
             pipeline,
-            1, 1, 1
+            computeWidth, computeHeight, computeDepth
         );
         // Have to wait here before we transfer ownership of the buffer.
         vkQueueWaitIdle(vk.computeQueue);
@@ -381,12 +386,25 @@ WinMain(
             }
             DispatchMessage(&msg); 
         } while(!done && messageAvailable);
+
+        // Render frame.
+        present(vk, cmds, 1);
         
         // Frame rate independent movement stuff.
         QueryPerformanceCounter(&frameEnd);
         float frameTime = (frameEnd.QuadPart - frameStart.QuadPart) /
             (float)counterFrequency.QuadPart;
         float moveDelta = DELTA_MOVE_PER_S * frameTime;
+
+        // Mouse.
+        Vec2i mouseDelta = mouse->getDelta();
+        auto mouseDeltaX = mouseDelta.x * MOUSE_SENSITIVITY;
+        rotY -= mouseDeltaX;
+        auto mouseDeltaY = mouseDelta.y * MOUSE_SENSITIVITY;
+        rotX += mouseDeltaY;
+        quaternionInit(uniforms.rotation);
+        rotateQuaternionY(rotY, uniforms.rotation);
+        rotateQuaternionX(rotX, uniforms.rotation);
 
         // Keyboard.
         if (keyboard['W']) {
@@ -402,19 +420,7 @@ WinMain(
             movePerpendicularToQuaternion(moveDelta, uniforms.rotation, uniforms.eye);
         }
 
-        // Mouse.
-        Vec2i mouseDelta = mouse->getDelta();
-        auto mouseDeltaX = mouseDelta.x * MOUSE_SENSITIVITY;
-        rotY -= mouseDeltaX;
-        auto mouseDeltaY = mouseDelta.y * MOUSE_SENSITIVITY;
-        rotX += mouseDeltaY;
-        quaternionInit(uniforms.rotation);
-        rotateQuaternionY(rotY, uniforms.rotation);
-        rotateQuaternionX(rotX, uniforms.rotation);
         updateUniforms(vk, &uniforms, sizeof(uniforms));
-
-        // Render frame.
-        present(vk, cmds, 1);
     }
     arrfree(cmds);
 
