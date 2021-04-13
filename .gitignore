@@ -5,3 +5,5 @@ LOG
 *.spv
 RenderDoc.cap
 RemedyBG.rdbg
+.idea
+cmake-build-debug
