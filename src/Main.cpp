@@ -129,7 +129,7 @@ WindowProc(
     return DefWindowProc(window, message, wParam, lParam);
 }
 
-int
+int __stdcall
 WinMain(
     HINSTANCE instance,
     HINSTANCE prevInstance,
@@ -153,7 +153,7 @@ WinMain(
         WNDCLASSEX windowClassProperties = {};
         windowClassProperties.cbSize = sizeof(windowClassProperties);
         windowClassProperties.style = CS_HREDRAW | CS_VREDRAW;
-        windowClassProperties.lpfnWndProc = WindowProc;
+        windowClassProperties.lpfnWndProc = (WNDPROC)WindowProc;
         windowClassProperties.hInstance = instance;
         windowClassProperties.lpszClassName = "MainWindowClass";
         ATOM windowClass = RegisterClassEx(&windowClassProperties);
