@@ -364,7 +364,6 @@ WinMain(
     // Main loop.
     LARGE_INTEGER frameStart = {};
     LARGE_INTEGER frameEnd = {};
-    i64 frameDelta = 0;
     BOOL done = false;
     int errorCode = 0;
     while (!done) {
