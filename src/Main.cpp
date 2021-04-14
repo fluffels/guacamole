@@ -1,72 +1,11 @@
 #include <Windows.h>
 
-#include <stdio.h>
-#include <stdint.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <cstdio>
+#include <cstdint>
 
-LARGE_INTEGER counterEpoch;
-LARGE_INTEGER counterFrequency;
-FILE* logFile;
-
-float GetElapsed() {
-    LARGE_INTEGER t;
-    QueryPerformanceCounter(&t);
-    auto result =
-        (t.QuadPart - counterEpoch.QuadPart)
-        / (float)counterFrequency.QuadPart;
-    return result;
-}
-
-#define TIME()\
-    fprintf(logFile, "[%f]", GetElapsed());
-
-#define LOC()\
-    fprintf(logFile, "[%s:%d]", __FILE__, __LINE__);
-
-#define LOG(level, ...)\
-    LOC()\
-    TIME()\
-    fprintf(logFile, "[%s] ", level);\
-    fprintf(logFile, __VA_ARGS__); \
-    fprintf(logFile, "\n"); \
-    fflush(logFile);
-
-#define FATAL(...)\
-    LOG("FATAL", __VA_ARGS__);\
-    exit(1);
-
-#define WARN(...) LOG("WARN", __VA_ARGS__);
-
-#define ERR(...) LOG("ERROR", __VA_ARGS__);
-
-#define INFO(...)\
-    LOG("INFO", __VA_ARGS__)
-
-#define CHECK(x, ...)\
-    if (!x) { FATAL(__VA_ARGS__) }
-
-#define LERROR(x) \
-    if (x) { \
-        char buffer[1024]; \
-        strerror_s(buffer, errno); \
-        FATAL(buffer); \
-    }
-
-typedef int8_t i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef int64_t i64;
-
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
-typedef float f32;
-typedef double f64;
-
+#include "jcwk/Logging.h"
 #include "jcwk/MathLib.cpp"
+#include "jcwk/Types.h"
 
 #pragma pack(push, 1)
 struct Uniforms {
@@ -75,8 +14,6 @@ struct Uniforms {
     Quaternion rotation;
 };
 #pragma pack(pop)
-
-#define READ(buffer, type, offset) (type*)(buffer + offset)
 
 #define STB_DS_IMPLEMENTATION
 #include "stb/stb_ds.h"
@@ -92,14 +29,13 @@ struct Uniforms {
 #include "stb/stb_image.h"
 
 #ifdef WIN32
-#define VK_USE_PLATFORM_WIN32_KHR
 #include "jcwk/FileSystem.cpp"
 #include "jcwk/Win32/DirectInput.cpp"
 #include "jcwk/Win32/Controller.cpp"
 #include "jcwk/Win32/Mouse.cpp"
 #define VULKAN_COMPUTE
+#define VK_USE_PLATFORM_WIN32_KHR
 #include "jcwk/Vulkan.cpp"
-#include <vulkan/vulkan_win32.h>
 #endif
 
 const float DELTA_MOVE_PER_S = 100.f;
@@ -107,8 +43,8 @@ const float MOUSE_SENSITIVITY = 0.1f;
 const float JOYSTICK_SENSITIVITY = 5;
 bool keyboard[VK_OEM_CLEAR] = {};
 
-LRESULT
-WindowProc(
+LRESULT __stdcall
+VKAPI_CALL WindowProc(
     HWND    window,
     UINT    message,
     WPARAM  wParam,
@@ -125,6 +61,8 @@ WindowProc(
         case WM_KEYUP:
             keyboard[(uint16_t)wParam] = false;
             break;
+        default:
+            break;
     }
     return DefWindowProc(window, message, wParam, lParam);
 }
@@ -136,19 +74,12 @@ WinMain(
     LPSTR commandLine,
     int showCommand
 ) {
-    // NOTE: Initialize logging.
-    {
-        auto error = fopen_s(&logFile, "LOG", "w");
-        if (error) return 1;
-
-        QueryPerformanceCounter(&counterEpoch);
-        QueryPerformanceFrequency(&counterFrequency);
-    }
+    initLogging();
 
     // NOTE: Create window.
     int screenWidth;
     int screenHeight;
-    HWND window = NULL;
+    HWND window;
     {
         WNDCLASSEX windowClassProperties = {};
         windowClassProperties.cbSize = sizeof(windowClassProperties);
@@ -157,7 +88,7 @@ WinMain(
         windowClassProperties.hInstance = instance;
         windowClassProperties.lpszClassName = "MainWindowClass";
         ATOM windowClass = RegisterClassEx(&windowClassProperties);
-        CHECK(windowClass, "Could not create window class");
+        CHECK(windowClass, "Could not create window class")
 
         window = CreateWindowEx(
             0,
@@ -168,12 +99,12 @@ WinMain(
             CW_USEDEFAULT,
             800,
             800,
-            NULL,
-            NULL,
+            nullptr,
+            nullptr,
             instance,
-            NULL
+            nullptr
         );
-        CHECK(window, "Could not create window");
+        CHECK(window, "Could not create window")
 
         screenWidth = GetSystemMetrics(SM_CXSCREEN);
         screenHeight = GetSystemMetrics(SM_CYSCREEN);
@@ -188,14 +119,14 @@ WinMain(
         );
         ShowCursor(FALSE);
 
-        INFO("Window created");
+        INFO("Window created")
     }
 
     // Create Vulkan instance.
     Vulkan vk;
-    vk.extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+    vk.extensions.emplace_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
     createVKInstance(vk);
-    INFO("Vulkan instance created");
+    INFO("Vulkan instance created")
 
     // Create Windows surface.
     {
@@ -210,16 +141,16 @@ WinMain(
             nullptr,
             &vk.swap.surface
         );
-        VKCHECK(result, "could not create win32 surface");
-        INFO("Surface created");
+        VKCHECK(result, "could not create win32 surface")
+        INFO("Surface created")
     }
 
     // Initialize Vulkan.
     initVK(vk);
-    INFO("Vulkan initialized");
+    INFO("Vulkan initialized")
 
     // Init & execute compute shader.
-    VulkanBuffer computedBuffer;
+    VulkanBuffer computedBuffer = {};
     const u32 computeWidth = 32;
     const u32 computeHeight = computeWidth;
     const u32 computeDepth = computeWidth;
@@ -270,7 +201,7 @@ WinMain(
     }
 
     // Record command buffers.
-    VkCommandBuffer* cmds = NULL;
+    VkCommandBuffer* cmds = nullptr;
     {
         VulkanPipeline defaultPipeline;
         initVKPipelineNoCull(
@@ -339,14 +270,13 @@ WinMain(
 
             vkCmdEndRenderPass(cmd);
 
-            VKCHECK(vkEndCommandBuffer(cmd));
+            VKCHECK(vkEndCommandBuffer(cmd))
         }
     }
 
     // Initialize DirectInput.
     DirectInput directInput(instance);
     auto mouse = directInput.mouse;
-    auto controller = directInput.controller;
 
     // Initialize state.
     float rotY = 0;
@@ -391,15 +321,15 @@ WinMain(
         
         // Frame rate independent movement stuff.
         QueryPerformanceCounter(&frameEnd);
-        float frameTime = (frameEnd.QuadPart - frameStart.QuadPart) /
+        float frameTime = (float)(frameEnd.QuadPart - frameStart.QuadPart) /
             (float)counterFrequency.QuadPart;
         float moveDelta = DELTA_MOVE_PER_S * frameTime;
 
         // Mouse.
         Vec2i mouseDelta = mouse->getDelta();
-        auto mouseDeltaX = mouseDelta.x * MOUSE_SENSITIVITY;
+        auto mouseDeltaX = (float)mouseDelta.x * MOUSE_SENSITIVITY;
         rotY -= mouseDeltaX;
-        auto mouseDeltaY = mouseDelta.y * MOUSE_SENSITIVITY;
+        auto mouseDeltaY = (float)mouseDelta.y * MOUSE_SENSITIVITY;
         rotX += mouseDeltaY;
         quaternionInit(uniforms.rotation);
         rotateQuaternionY(rotY, uniforms.rotation);
