@@ -8,6 +8,10 @@
 #include "jcwk/Types.h"
 
 #pragma pack(push, 1)
+struct Vertex {
+    Vec4 position;
+    Vec4 normal;
+};
 struct Uniforms {
     float proj[16];
     Vec4 eye;
@@ -157,8 +161,8 @@ WinMain(
     const u32 computeCount = computeWidth * computeHeight * computeDepth;
     const u32 computeVerticesPerExecution = 15;
     const u32 computedVertexCount = computeVerticesPerExecution * computeCount;
-    const u32 computedVertexWidth = 4;
-    const int computeSize = computedVertexCount * computedVertexWidth * sizeof(float);
+    const u32 computedVertexWidth = sizeof(Vertex);
+    const int computeSize = computedVertexCount * computedVertexWidth;
     {
         VulkanPipeline pipeline;
         initVKPipelineCompute(
