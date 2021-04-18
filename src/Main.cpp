@@ -42,7 +42,7 @@ struct Uniforms {
 #include "jcwk/Vulkan.cpp"
 #endif
 
-const float DELTA_MOVE_PER_S = 100.f;
+const float DELTA_MOVE_PER_S = 10.f;
 const float MOUSE_SENSITIVITY = 0.1f;
 const float JOYSTICK_SENSITIVITY = 5;
 bool keyboard[VK_OEM_CLEAR] = {};

@@ -7,7 +7,8 @@
 layout(location=0) in vec4 inPosition;
 layout(location=1) in vec4 inNormal;
 
-layout(location=0) out vec4 outNormal;
+layout(location=0) out vec4 outColor;
+layout(location=1) out float outLight;
 
 void main() {
     vec4 p = inPosition;
@@ -15,5 +16,9 @@ void main() {
     p = rotate_vertex_position(uniforms.rotation, p);
     p = uniforms.proj * p;
     gl_Position = p;
-    outNormal = inNormal;
+    // vec3 lightDir = normalize(inPosition.xyz - uniforms.eye.xyz);
+    vec3 lightDir = normalize(uniforms.eye.xyz - inPosition.xyz);
+    // vec3 lightDir = vec3(1, 0, 0);
+    outColor = inNormal;
+    outLight = dot(lightDir, inNormal.xyz);
 }
