@@ -208,7 +208,7 @@ WinMain(
     VkCommandBuffer* cmds = nullptr;
     {
         VulkanPipeline defaultPipeline;
-        initVKPipelineNoCull(
+        initVKPipeline(
             vk,
             "default",
             defaultPipeline
