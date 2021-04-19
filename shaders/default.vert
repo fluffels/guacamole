@@ -16,9 +16,9 @@ void main() {
     p = rotate_vertex_position(uniforms.rotation, p);
     p = uniforms.proj * p;
     gl_Position = p;
-    // vec3 lightDir = normalize(inPosition.xyz - uniforms.eye.xyz);
-    vec3 lightDir = normalize(uniforms.eye.xyz - inPosition.xyz);
-    // vec3 lightDir = vec3(1, 0, 0);
+    vec3 lightV = uniforms.eye.xyz - inPosition.xyz;
+    float dist = length(lightV);
+    vec3 lightDir = lightV / dist;
     outColor = inNormal;
-    outLight = dot(lightDir, inNormal.xyz);
+    outLight = dot(lightDir, inNormal.xyz) * (1 / dist);
 }
