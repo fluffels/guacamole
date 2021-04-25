@@ -13,6 +13,10 @@ layout(set=0, binding=0) buffer OutputBuffer {
     Vertex vertices[];
 } outputData;
 
+layout(push_constant) uniform PushConstants {
+    vec4 baseOffset;
+} params;
+
 /* See http://paulbourke.net/geometry/polygonise/marchingsource.cpp */
 vec3 vertexOffsets[8] = {
     vec3(0.0,  0.0, 0.0),
@@ -317,7 +321,7 @@ void main() {
     uint X = gl_GlobalInvocationID.x;
     uint Y = gl_GlobalInvocationID.y;
     uint Z = gl_GlobalInvocationID.z;
-    vec3 vertexBase = vec3(X, Y, Z);
+    vec3 vertexBase = params.baseOffset.xyz + vec3(X, Y, Z);
 
     float[8] densities;
     for (int i = 0; i < 8; i++) {

@@ -12,6 +12,9 @@ struct Vertex {
     Vec4 position;
     Vec4 normal;
 };
+struct Params {
+    Vec4 baseOffset;
+};
 struct Uniforms {
     float proj[16];
     Vec4 eye;
@@ -183,10 +186,14 @@ WinMain(
             0,
             computedBuffer.handle
         );
+        Params params = {
+            { 32.f, 32.f, 32.f, 0 }
+        };
         dispatchCompute(
             vk,
             pipeline,
-            computeWidth, computeHeight, computeDepth
+            computeWidth, computeHeight, computeDepth,
+            sizeof(params), &params
         );
         // Have to wait here before we transfer ownership of the buffer.
         vkQueueWaitIdle(vk.computeQueue);
