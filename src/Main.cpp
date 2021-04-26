@@ -157,7 +157,8 @@ WinMain(
     INFO("Vulkan initialized")
 
     // Init & execute compute shader.
-    VulkanBuffer computedBuffer = {};
+    const size_t computedBufferCount = 3 * 3 * 3;
+    VulkanBuffer computedBuffers[computedBufferCount] = {};
     const u32 computeWidth = 32;
     const u32 computeHeight = computeWidth;
     const u32 computeDepth = computeWidth;
@@ -173,42 +174,54 @@ WinMain(
             "cs",
             pipeline
         );
-        createComputeToVertexBuffer(
-            vk.device,
-            vk.memories,
-            vk.computeQueueFamily,
-            computeSize,
-            computedBuffer
-        );
-        updateStorageBuffer(
-            vk.device,
-            pipeline.descriptorSet,
-            0,
-            computedBuffer.handle
-        );
-        Params params = {
-            { 32.f, 32.f, 32.f, 0 }
-        };
-        dispatchCompute(
-            vk,
-            pipeline,
-            computeWidth, computeHeight, computeDepth,
-            sizeof(params), &params
-        );
-        // Have to wait here before we transfer ownership of the buffer.
-        vkQueueWaitIdle(vk.computeQueue);
-        transferBufferOwnership(
-            vk.device,
-            vk.cmdPoolComputeTransient,
-            vk.cmdPoolTransient,
-            vk.computeQueue,
-            vk.queue,
-            computedBuffer.handle,
-            vk.computeQueueFamily,
-            vk.queueFamily,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
-        );
+        for (int i = 0; i < computedBufferCount; i++) {
+            createComputeToVertexBuffer(
+                vk.device,
+                vk.memories,
+                vk.computeQueueFamily,
+                computeSize,
+                computedBuffers[i]
+            );
+        }
+        auto bufferIdx = 0;
+        for (int x = 0; x < 3; x++) {
+            for (int y = 0; y < 3; y++) {
+                for (int z = 0; z < 3; z++) {
+                    updateStorageBuffer(
+                        vk.device,
+                        pipeline.descriptorSet,
+                        0,
+                        computedBuffers[bufferIdx].handle
+                    );
+                    Params params = {
+                        { x * 32.f, y * 32.f, z * 32.f, 0 }
+                    };
+                    dispatchCompute(
+                        vk,
+                        pipeline,
+                        computeWidth, computeHeight, computeDepth,
+                        sizeof(params), &params
+                    );
+                    // Have to wait here before we transfer ownership of the buffer.
+                    vkQueueWaitIdle(vk.computeQueue);
+                    bufferIdx++;
+                }
+            }
+        }
+        for (int i = 0; i < computedBufferCount; i++) {
+            transferBufferOwnership(
+                vk.device,
+                vk.cmdPoolComputeTransient,
+                vk.cmdPoolTransient,
+                vk.computeQueue,
+                vk.queue,
+                computedBuffers[i].handle,
+                vk.computeQueueFamily,
+                vk.queueFamily,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
+            );
+        }
     }
 
     // Record command buffers.
@@ -257,12 +270,6 @@ WinMain(
                 defaultPipeline.handle
             );
             VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(
-                cmd,
-                0, 1,
-                &computedBuffer.handle,
-                offsets
-            );
             vkCmdBindDescriptorSets(
                 cmd,
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -271,13 +278,21 @@ WinMain(
                 &defaultPipeline.descriptorSet,
                 0, nullptr
             );
-            vkCmdDraw(
-                cmd,
-                computedVertexCount,
-                1,
-                0,
-                0
-            );
+            for (size_t i = 0; i < computedBufferCount; i++) {
+                vkCmdBindVertexBuffers(
+                    cmd,
+                    0, 1,
+                    &computedBuffers[i].handle,
+                    offsets
+                );
+                vkCmdDraw(
+                    cmd,
+                    computedVertexCount,
+                    1,
+                    0,
+                    0
+                );
+            }
 
             vkCmdEndRenderPass(cmd);
 
