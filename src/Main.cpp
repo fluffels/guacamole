@@ -49,6 +49,7 @@ struct Uniforms {
 #endif
 
 #include "Text.cpp"
+#include "Generation.cpp"
 
 const float DELTA_MOVE_PER_S = 10.f;
 const float MOUSE_SENSITIVITY = 0.1f;
@@ -163,77 +164,8 @@ WinMain(
 
     initText(vk);
 
-    Vec3i chunkCoord = {0, 0, 0};
-    // Init & execute compute shader.
-    VulkanBuffer computeBuffer = {};
-    const u32 computeWidth = 32;
-    const u32 computeHeight = computeWidth;
-    const u32 computeDepth = computeWidth;
-    const u32 computeCount = computeWidth * computeHeight * computeDepth;
-    const u32 computeVerticesPerExecution = 15;
-    const u32 computeVertexCount = computeVerticesPerExecution * computeCount;
-    const u32 computeVertexWidth = sizeof(Vertex);
-    const int computeSize = computeVertexCount * computeVertexWidth;
-    {
-        VulkanPipeline pipeline;
-        initVKPipelineCompute(
-            vk,
-            "cs",
-            pipeline
-        );
-        createStorageBuffer( vk.device,
-            vk.memories,
-            vk.computeQueueFamily,
-            computeSize,
-            computeBuffer
-        );
-        updateStorageBuffer(
-            vk.device,
-            pipeline.descriptorSet,
-            0,
-            computeBuffer.handle
-        );
-        Params params = {
-            {chunkCoord.x * 32.f, chunkCoord.y * 32.f, chunkCoord.z * 32.f, 0}
-        };
-        dispatchCompute(
-            vk,
-            pipeline,
-            computeWidth, computeHeight, computeDepth,
-            sizeof(params), &params
-        );
-        vkQueueWaitIdle(vk.computeQueue);
-    }
-
-    VulkanBuffer vertexBuffer = {};
-    u32 vertexCount = 0;
-    createVertexBuffer(
-        vk.device,
-        vk.memories,
-        vk.queueFamily,
-        computeSize,
-        vertexBuffer
-    );
-
-    {
-        auto src = (Vertex*)mapMemory(vk.device, computeBuffer.memory);
-        auto dst = (Vertex*)mapMemory(vk.device, vertexBuffer.memory);
-        for (int it = 0; it < computeVertexCount; it++) {
-            if ((src->position.x != 0.f) ||
-                    (src->position.y != 0.f) ||
-                    (src->position.z != 0.f)) {
-                *dst = *src;
-                dst++;
-                vertexCount++;
-            }
-            src++;
-        }
-        unMapMemory(vk.device, computeBuffer.memory);
-        unMapMemory(vk.device, vertexBuffer.memory);
-        destroyBuffer(vk, computeBuffer);
-    }
-
-    // Wait for transfer to complete.
+    Chunk chunk = {};
+    generate(vk, chunk);
     INFO("Vertex buffers filled");
 
     // Setup pipelines.
@@ -361,12 +293,12 @@ WinMain(
             vkCmdBindVertexBuffers(
                 cmd,
                 0, 1,
-                &vertexBuffer.handle,
+                &chunk.vertexBuffer.handle,
                 offsets
             );
             vkCmdDraw(
                 cmd,
-                vertexCount,
+                chunk.vertexCount,
                 1,
                 0,
                 0
