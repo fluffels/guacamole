@@ -164,9 +164,15 @@ WinMain(
 
     initText(vk);
 
-    Chunk chunk = {};
-    Vec3i chunkCoord = {0, 0, 0};
-    generate(vk, chunkCoord, chunk);
+    vector<Chunk> chunks;
+    for (int x = 0; x < 3; x++) {
+        for (int y = 0; y < 3; y++) {
+            for (int z = 0; z < 3; z++) {
+                Vec3i chunkCoord = {x, y, z};
+                generate(vk, chunkCoord, chunks.emplace_back());
+            }
+        }
+    }
     INFO("Vertex buffers filled");
 
     // Setup pipelines.
@@ -209,8 +215,11 @@ WinMain(
     updateUniforms(vk, &uniforms, sizeof(uniforms));
 
     // Main loop.
+    LARGE_INTEGER firstFrame = {};
+    QueryPerformanceCounter(&firstFrame);
     LARGE_INTEGER frameStart = {};
     LARGE_INTEGER frameEnd = {};
+    Vec3i currentChunk = {};
     float frameTime = 0;
     float averageFrameTime = 0;
     float frameCount = 0;
@@ -291,27 +300,32 @@ WinMain(
                 &defaultPipeline.descriptorSet,
                 0, nullptr
             );
-            vkCmdBindVertexBuffers(
-                cmd,
-                0, 1,
-                &chunk.vertexBuffer.handle,
-                offsets
-            );
-            vkCmdDraw(
-                cmd,
-                chunk.vertexCount,
-                1,
-                0,
-                0
-            );
+            for (auto& chunk: chunks) {
+                vkCmdBindVertexBuffers(
+                    cmd,
+                    0, 1,
+                    &chunk.vertexBuffer.handle,
+                    offsets
+                );
+                vkCmdDraw(
+                    cmd,
+                    chunk.vertexCount,
+                    1,
+                    0,
+                    0
+                );
+            }
 
             startText();
-            display("Hello, world!");
             display("%.4fms (%.2f Hz)", frameTime * 1000, 1.f / frameTime);
             display("%.4fms (%.2f Hz)", averageFrameTime * 1000, 1.f / averageFrameTime);
             display(
                 "%.4fx %.4fy %.4fz",
                 uniforms.eye.x, uniforms.eye.y, uniforms.eye.z
+            );
+            display(
+                "%dx %dy %dz",
+                currentChunk.x, currentChunk.y, currentChunk.z
             );
             display(
                 "%.4fx %.4fy %.4fz %.4fw",
@@ -362,7 +376,8 @@ WinMain(
         QueryPerformanceCounter(&frameEnd);
         frameTime = (float)(frameEnd.QuadPart - frameStart.QuadPart) /
             (float)counterFrequency.QuadPart;
-        float totalTime = GetElapsed();
+        float totalTime = (float)(frameEnd.QuadPart - firstFrame.QuadPart) /
+            (float)counterFrequency.QuadPart;
         averageFrameTime = totalTime / frameCount;
         float moveDelta = DELTA_MOVE_PER_S * frameTime;
 
@@ -389,6 +404,10 @@ WinMain(
         if (keyboard['D']) {
             movePerpendicularToQuaternion(moveDelta, uniforms.rotation, uniforms.eye);
         }
+
+        currentChunk.x = (i32)floor(uniforms.eye.x / computeWidth);
+        currentChunk.y = (i32)floor(uniforms.eye.y / computeWidth);
+        currentChunk.z = (i32)floor(uniforms.eye.z / computeWidth);
 
         updateUniforms(vk, &uniforms, sizeof(uniforms));
     }

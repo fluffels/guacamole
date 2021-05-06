@@ -4,18 +4,19 @@ struct Chunk {
     u32 vertexCount;
 };
 
+const u32 computeWidth = 32;
+const u32 computeHeight = computeWidth;
+const u32 computeDepth = computeWidth;
+const u32 computeCount = computeWidth * computeHeight * computeDepth;
+const u32 computeVerticesPerExecution = 15;
+const u32 computeVertexCount = computeVerticesPerExecution * computeCount;
+const u32 computeVertexWidth = sizeof(Vertex);
+const int computeSize = computeVertexCount * computeVertexWidth;
+
 void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
     chunk.coord = coord;
     // Init & execute compute shader.
     VulkanBuffer computeBuffer = {};
-    const u32 computeWidth = 32;
-    const u32 computeHeight = computeWidth;
-    const u32 computeDepth = computeWidth;
-    const u32 computeCount = computeWidth * computeHeight * computeDepth;
-    const u32 computeVerticesPerExecution = 15;
-    const u32 computeVertexCount = computeVerticesPerExecution * computeCount;
-    const u32 computeVertexWidth = sizeof(Vertex);
-    const int computeSize = computeVertexCount * computeVertexWidth;
     {
         VulkanPipeline pipeline;
         initVKPipelineCompute(
