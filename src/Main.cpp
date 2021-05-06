@@ -12,11 +12,16 @@ struct Vertex {
     Vec4 position;
     Vec4 normal;
 };
+struct TextVertex {
+    Vec2 position;
+    Vec2 tex;
+};
 struct Params {
     Vec4 baseOffset;
 };
 struct Uniforms {
     float proj[16];
+    float ortho[16];
     Vec4 eye;
     Quaternion rotation;
 };
@@ -162,9 +167,7 @@ WinMain(
     stbtt_bakedchar bakedChars[96];
     VulkanSampler fontAtlas = {};
     {
-        // FIXME
-        // auto fontFile = openFile("./FiraCode-Bold.tff", "r");
-        auto fontFile = openFile("c:/windows/fonts/times.ttf", "r");
+        auto fontFile = openFile("fonts/FiraCode-Bold.ttf", "r");
         auto ttfBuffer = new u8[1 << 20];
         fread(ttfBuffer, 1, 1<<20, fontFile);
         const u32 fontWidth = 512;
@@ -280,15 +283,21 @@ WinMain(
 
     VulkanPipeline textPipeline;
     {
-        initVKPipeline(
+        initVKPipelineNoCull(
             vk,
             "text",
             textPipeline
         );
-        updateCombinedImageSampler(
+        updateUniformBuffer(
             vk.device,
             textPipeline.descriptorSet,
             0,
+            vk.uniforms.handle
+        );
+        updateCombinedImageSampler(
+            vk.device,
+            textPipeline.descriptorSet,
+            1,
             &fontAtlas,
             1
         );
@@ -309,11 +318,18 @@ WinMain(
         10.f, .1f,
         uniforms.proj
     );
+    matrixOrtho(
+        screenWidth,
+        screenHeight,
+        uniforms.ortho
+    );
     uniforms.eye.z = -2.f;
+    updateUniforms(vk, &uniforms, sizeof(uniforms));
 
     // Main loop.
     LARGE_INTEGER frameStart = {};
     LARGE_INTEGER frameEnd = {};
+    float frameTime = 0;
     BOOL done = false;
     int errorCode = 0;
     while (!done) {
@@ -419,6 +435,88 @@ WinMain(
                 0, 1, &textPipeline.descriptorSet,
                 0, nullptr
             );
+            char* text[255];
+            auto c = (char*)text;
+            sprintf(c, "%.4fs", frameTime); //@error
+            size_t textLength = strlen(c);
+            float xPos = 16.f;
+            float yPos = 32.f;
+            size_t textVertexCount = textLength*4;
+            size_t textIndexCount = textLength*6;
+            size_t textVertexSize = textVertexCount * sizeof(TextVertex);
+            size_t textIndexSize = textIndexCount * sizeof(u32);
+            TextVertex* textVertices = nullptr;
+            TextVertex* v = arraddnptr(textVertices, textVertexCount);
+            u32* textIndices = nullptr;
+            u32* i = arraddnptr(textIndices, textIndexCount);
+            u32 it = 0;
+            while (*c) {
+                stbtt_aligned_quad q;
+                stbtt_GetBakedQuad(bakedChars, 512, 512, *c-32, &xPos, &yPos, &q, 1);
+                {
+                    v->tex.x = q.s0;
+                    v->tex.y = q.t1;
+                    v->position.x = q.x0;
+                    v->position.y = q.y1;
+                    v++;
+                }
+                {
+                    v->tex.x = q.s1;
+                    v->tex.y = q.t1;
+                    v->position.x = q.x1;
+                    v->position.y = q.y1;
+                    v++;
+                }
+                {
+                    v->tex.x = q.s1;
+                    v->tex.y = q.t0;
+                    v->position.x = q.x1;
+                    v->position.y = q.y0;
+                    v++;
+                }
+                {
+                    v->tex.x = q.s0;
+                    v->tex.y = q.t0;
+                    v->position.x = q.x0;
+                    v->position.y = q.y0;
+                    v++;
+                }
+                i[0] = it + 0;
+                i[1] = it + 1;
+                i[2] = it + 2;
+                i[3] = it + 2;
+                i[4] = it + 3;
+                i[5] = it + 0;
+                i += 6;
+                it += 4;
+                c++;
+            }
+            VulkanMesh textMesh = {}; //@leak
+            uploadMesh(
+                vk,
+                textVertices, textVertexSize,
+                textIndices, textIndexSize,
+                textMesh
+            );
+            arrfree(textVertices);
+            arrfree(textIndices);
+            vkCmdBindVertexBuffers(
+                cmd,
+                0, 1,
+                &textMesh.vBuff.handle,
+                offsets
+            );
+            vkCmdBindIndexBuffer(
+                cmd,
+                textMesh.iBuff.handle,
+                0,
+                VK_INDEX_TYPE_UINT32 //FIXME: should be 16
+            );
+            vkCmdDrawIndexed(
+                cmd,
+                textIndexCount,
+                1, 0, 0, 0
+            );
 
             vkCmdEndRenderPass(cmd);
             VKCHECK(vkEndCommandBuffer(cmd))
@@ -457,7 +555,7 @@ WinMain(
 
         // Frame rate independent movement stuff.
         QueryPerformanceCounter(&frameEnd);
-        float frameTime = (float)(frameEnd.QuadPart - frameStart.QuadPart) /
+        frameTime = (float)(frameEnd.QuadPart - frameStart.QuadPart) /
             (float)counterFrequency.QuadPart;
         float moveDelta = DELTA_MOVE_PER_S * frameTime;
 
