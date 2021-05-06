@@ -163,17 +163,17 @@ WinMain(
 
     initText(vk);
 
+    Vec3i chunkCoord = {0, 0, 0};
     // Init & execute compute shader.
-    const size_t computedBufferCount = 3 * 3 * 3;
-    VulkanBuffer computedBuffers[computedBufferCount] = {};
+    VulkanBuffer computeBuffer = {};
     const u32 computeWidth = 32;
     const u32 computeHeight = computeWidth;
     const u32 computeDepth = computeWidth;
     const u32 computeCount = computeWidth * computeHeight * computeDepth;
     const u32 computeVerticesPerExecution = 15;
-    const u32 computedVertexCount = computeVerticesPerExecution * computeCount;
-    const u32 computedVertexWidth = sizeof(Vertex);
-    const int computeSize = computedVertexCount * computedVertexWidth;
+    const u32 computeVertexCount = computeVerticesPerExecution * computeCount;
+    const u32 computeVertexWidth = sizeof(Vertex);
+    const int computeSize = computeVertexCount * computeVertexWidth;
     {
         VulkanPipeline pipeline;
         initVKPipelineCompute(
@@ -181,57 +181,60 @@ WinMain(
             "cs",
             pipeline
         );
-        for (int i = 0; i < computedBufferCount; i++) {
-            createComputeToVertexBuffer(
-                vk.device,
-                vk.memories,
-                vk.computeQueueFamily,
-                computeSize,
-                computedBuffers[i]
-            );
-        }
-        auto bufferIdx = 0;
-        for (int x = 0; x < 3; x++) {
-            for (int y = 0; y < 3; y++) {
-                for (int z = 0; z < 3; z++) {
-                    updateStorageBuffer(
-                        vk.device,
-                        pipeline.descriptorSet,
-                        0,
-                        computedBuffers[bufferIdx].handle
-                    );
-                    Params params = {
-                        { x * 32.f, y * 32.f, z * 32.f, 0 }
-                    };
-                    dispatchCompute(
-                        vk,
-                        pipeline,
-                        computeWidth, computeHeight, computeDepth,
-                        sizeof(params), &params
-                    );
-                    bufferIdx++;
-                }
-            }
-        }
-        // Have to wait here before we transfer ownership of the buffer.
+        createStorageBuffer( vk.device,
+            vk.memories,
+            vk.computeQueueFamily,
+            computeSize,
+            computeBuffer
+        );
+        updateStorageBuffer(
+            vk.device,
+            pipeline.descriptorSet,
+            0,
+            computeBuffer.handle
+        );
+        Params params = {
+            {chunkCoord.x * 32.f, chunkCoord.y * 32.f, chunkCoord.z * 32.f, 0}
+        };
+        dispatchCompute(
+            vk,
+            pipeline,
+            computeWidth, computeHeight, computeDepth,
+            sizeof(params), &params
+        );
         vkQueueWaitIdle(vk.computeQueue);
-        for (int i = 0; i < computedBufferCount; i++) {
-            transferBufferOwnership(
-                vk.device,
-                vk.cmdPoolComputeTransient,
-                vk.cmdPoolTransient,
-                vk.computeQueue,
-                vk.queue,
-                computedBuffers[i].handle,
-                vk.computeQueueFamily,
-                vk.queueFamily,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
-            );
-        }
     }
+
+    VulkanBuffer vertexBuffer = {};
+    u32 vertexCount = 0;
+    createVertexBuffer(
+        vk.device,
+        vk.memories,
+        vk.queueFamily,
+        computeSize,
+        vertexBuffer
+    );
+
+    {
+        auto src = (Vertex*)mapMemory(vk.device, computeBuffer.memory);
+        auto dst = (Vertex*)mapMemory(vk.device, vertexBuffer.memory);
+        for (int it = 0; it < computeVertexCount; it++) {
+            if ((src->position.x != 0.f) ||
+                    (src->position.y != 0.f) ||
+                    (src->position.z != 0.f)) {
+                *dst = *src;
+                dst++;
+                vertexCount++;
+            }
+            src++;
+        }
+        unMapMemory(vk.device, computeBuffer.memory);
+        unMapMemory(vk.device, vertexBuffer.memory);
+        destroyBuffer(vk, computeBuffer);
+    }
+
     // Wait for transfer to complete.
-    vkDeviceWaitIdle(vk.device);
+    INFO("Vertex buffers filled");
 
     // Setup pipelines.
     VulkanPipeline defaultPipeline;
@@ -257,6 +260,7 @@ WinMain(
     float rotY = 0;
     float rotX = 0;
     Uniforms uniforms = {};
+    uniforms.eye.z = -2.f;
     matrixProjection(
         screenWidth,
         screenHeight,
@@ -269,13 +273,14 @@ WinMain(
         screenHeight,
         uniforms.ortho
     );
-    uniforms.eye.z = -2.f;
     updateUniforms(vk, &uniforms, sizeof(uniforms));
 
     // Main loop.
     LARGE_INTEGER frameStart = {};
     LARGE_INTEGER frameEnd = {};
     float frameTime = 0;
+    float averageFrameTime = 0;
+    float frameCount = 0;
     BOOL done = false;
     int errorCode = 0;
     while (!done) {
@@ -353,39 +358,36 @@ WinMain(
                 &defaultPipeline.descriptorSet,
                 0, nullptr
             );
-            for (auto &computedBuffer: computedBuffers) {
-                vkCmdBindVertexBuffers(
-                    cmd,
-                    0, 1,
-                    &computedBuffer.handle,
-                    offsets
-                );
-                vkCmdDraw(
-                    cmd,
-                    computedVertexCount,
-                    1,
-                    0,
-                    0
-                );
-            }
+            vkCmdBindVertexBuffers(
+                cmd,
+                0, 1,
+                &vertexBuffer.handle,
+                offsets
+            );
+            vkCmdDraw(
+                cmd,
+                vertexCount,
+                1,
+                0,
+                0
+            );
 
-            currentLine = 0;
-            char buffer[2048];
-            sprintf_s(buffer, "%.4fs", frameTime); //@error
-            displayLine(vk, cmd, buffer);
-            sprintf_s(
-                buffer, "%.4fx %.4fy %.4fz",
+            startText();
+            display("Hello, world!");
+            display("%.4fms (%.2f Hz)", frameTime * 1000, 1.f / frameTime);
+            display("%.4fms (%.2f Hz)", averageFrameTime * 1000, 1.f / averageFrameTime);
+            display(
+                "%.4fx %.4fy %.4fz",
                 uniforms.eye.x, uniforms.eye.y, uniforms.eye.z
-            ); //@error
-            displayLine(vk, cmd, buffer);
-            sprintf_s(
-                buffer, "%.4fx %.4fy %.4fz %.4fw",
+            );
+            display(
+                "%.4fx %.4fy %.4fz %.4fw",
                 uniforms.rotation.x,
                 uniforms.rotation.y,
                 uniforms.rotation.z,
                 uniforms.rotation.w
-            ); //@error
-            displayLine(vk, cmd, buffer);
+            );
+            endText(vk, cmd);
 
             vkCmdEndRenderPass(cmd);
             VKCHECK(vkEndCommandBuffer(cmd))
@@ -423,9 +425,12 @@ WinMain(
         );
 
         // Frame rate independent movement stuff.
+        frameCount++;
         QueryPerformanceCounter(&frameEnd);
         frameTime = (float)(frameEnd.QuadPart - frameStart.QuadPart) /
             (float)counterFrequency.QuadPart;
+        float totalTime = GetElapsed();
+        averageFrameTime = totalTime / frameCount;
         float moveDelta = DELTA_MOVE_PER_S * frameTime;
 
         // Mouse.
@@ -454,6 +459,8 @@ WinMain(
 
         updateUniforms(vk, &uniforms, sizeof(uniforms));
     }
+
+    INFO("Average frame time: %.2fms", averageFrameTime * 1000);
 
     return errorCode;
 }

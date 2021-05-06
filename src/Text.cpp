@@ -5,13 +5,47 @@ struct TextVertex {
 
 stbtt_bakedchar bakedChars[96];
 
+u32 textLineCount = 0;
 VulkanPipeline textPipeline;
+VulkanBuffer textVertexBuffer;
+VulkanBuffer textIndexBuffer;
+u32 textMaxCharacters = 25 * 100;
+u32 textVertexBufferSize = sizeof(TextVertex) * 4 * textMaxCharacters;
+u32 textIndexBufferSize = sizeof(u32) * 6 * textMaxCharacters;
+u32 textCurrentCharacter = 0;
+u32 textVertexCount = 0;
+u32 textIndexCount = 0;
+TextVertex *textVertices = nullptr;
+TextVertex* textCurrentVertex = nullptr;
+u32* textIndices = nullptr;
+u32* textCurrentIndex = nullptr;
+char* textBuffer = nullptr;
 
-u32 currentLine;
+void startText() {
+    textCurrentCharacter = 0;
+    textLineCount = 0;
+    textVertexCount = 0;
+    textIndexCount = 0;
+    textCurrentVertex = textVertices;
+    textCurrentIndex = textIndices;
+}
+
+#define display(fmt, ...) {\
+    auto count = sprintf_s( \
+        textBuffer + textCurrentCharacter,\
+        textMaxCharacters - textCurrentCharacter,\
+        fmt,\
+        __VA_ARGS__\
+    ); \
+    LERROR(count == -1)\
+    textCurrentCharacter += count + 1;\
+    textLineCount++;\
+}
 
 void initText(
     Vulkan& vk
 ) {
+    textBuffer = (char*)malloc(textMaxCharacters);
     // Load fonts.
     VulkanSampler fontAtlas = {};
     {
@@ -60,12 +94,27 @@ void initText(
         &fontAtlas,
         1
     );
+    createVertexBuffer(
+        vk.device,
+        vk.memories,
+        vk.queueFamily,
+        textVertexBufferSize,
+        textVertexBuffer
+    );
+    textVertices = (TextVertex*)mapMemory(vk.device, textVertexBuffer.memory);
+    createIndexBuffer(
+        vk.device,
+        vk.memories,
+        vk.queueFamily,
+        textIndexBufferSize,
+        textIndexBuffer
+    );
+    textIndices = (u32*)mapMemory(vk.device, textIndexBuffer.memory);
 }
 
-void displayLine(
+void endText(
     Vulkan& vk,
-    VkCommandBuffer cmd,
-    const char* text
+    VkCommandBuffer cmd
 ) {
     vkCmdBindPipeline(
         cmd,
@@ -79,79 +128,66 @@ void displayLine(
         0, 1, &textPipeline.descriptorSet,
         0, nullptr
     );
-    auto c = (char *) text;
-    size_t textLength = strlen(c);
-    float xPos = 16.f;
-    float yPos = (float)(currentLine+1) * 32.f;
-    size_t textVertexCount = textLength * 4;
-    size_t textIndexCount = textLength * 6;
-    size_t textVertexSize = textVertexCount * sizeof(TextVertex);
-    size_t textIndexSize = textIndexCount * sizeof(u32);
-    TextVertex *textVertices = nullptr;
-    TextVertex *v = arraddnptr(textVertices, textVertexCount);
-    u32 *textIndices = nullptr;
-    u32 *i = arraddnptr(textIndices, textIndexCount);
-    u32 it = 0;
-    while (*c) {
-        stbtt_aligned_quad q;
-        stbtt_GetBakedQuad(bakedChars, 512, 512, *c - 32, &xPos, &yPos, &q, 1);
-        {
-            v->tex.x = q.s0;
-            v->tex.y = q.t1;
-            v->position.x = q.x0;
-            v->position.y = q.y1;
-            v++;
+    auto c = (char *) textBuffer;
+    for (int line = 0; line < textLineCount; line++) {
+        float xPos = 16.f;
+        float yPos = float(line+1) * 32.f;
+        while (*c) {
+            stbtt_aligned_quad q;
+            stbtt_GetBakedQuad(bakedChars, 512, 512, *c - 32, &xPos, &yPos, &q, 1);
+            u32 baseIndex = textVertexCount;
+            {
+                textCurrentVertex->tex.x = q.s0;
+                textCurrentVertex->tex.y = q.t1;
+                textCurrentVertex->position.x = q.x0;
+                textCurrentVertex->position.y = q.y1;
+                textCurrentVertex++;
+            }
+            {
+                textCurrentVertex->tex.x = q.s1;
+                textCurrentVertex->tex.y = q.t1;
+                textCurrentVertex->position.x = q.x1;
+                textCurrentVertex->position.y = q.y1;
+                textCurrentVertex++;
+            }
+            {
+                textCurrentVertex->tex.x = q.s1;
+                textCurrentVertex->tex.y = q.t0;
+                textCurrentVertex->position.x = q.x1;
+                textCurrentVertex->position.y = q.y0;
+                textCurrentVertex++;
+            }
+            {
+                textCurrentVertex->tex.x = q.s0;
+                textCurrentVertex->tex.y = q.t0;
+                textCurrentVertex->position.x = q.x0;
+                textCurrentVertex->position.y = q.y0;
+                textCurrentVertex++;
+            }
+            textCurrentIndex[0] = baseIndex + 0;
+            textCurrentIndex[1] = baseIndex + 1;
+            textCurrentIndex[2] = baseIndex + 2;
+            textCurrentIndex[3] = baseIndex + 2;
+            textCurrentIndex[4] = baseIndex + 3;
+            textCurrentIndex[5] = baseIndex + 0;
+            textIndexCount += 6;
+            textCurrentIndex += 6;
+            textVertexCount += 4;
+            c++;
         }
-        {
-            v->tex.x = q.s1;
-            v->tex.y = q.t1;
-            v->position.x = q.x1;
-            v->position.y = q.y1;
-            v++;
-        }
-        {
-            v->tex.x = q.s1;
-            v->tex.y = q.t0;
-            v->position.x = q.x1;
-            v->position.y = q.y0;
-            v++;
-        }
-        {
-            v->tex.x = q.s0;
-            v->tex.y = q.t0;
-            v->position.x = q.x0;
-            v->position.y = q.y0;
-            v++;
-        }
-        i[0] = it + 0;
-        i[1] = it + 1;
-        i[2] = it + 2;
-        i[3] = it + 2;
-        i[4] = it + 3;
-        i[5] = it + 0;
-        i += 6;
-        it += 4;
+        // Read past the \0 that ended the previous line.
         c++;
     }
-    VulkanMesh textMesh = {}; //@leak
-    uploadMesh(
-        vk,
-        textVertices, textVertexSize,
-        textIndices, textIndexSize,
-        textMesh
-    );
-    arrfree(textVertices);
-    arrfree(textIndices);
     VkDeviceSize offsets[] = {0, 0};
     vkCmdBindVertexBuffers(
         cmd,
         0, 1,
-        &textMesh.vBuff.handle,
+        &textVertexBuffer.handle,
         offsets
     );
     vkCmdBindIndexBuffer(
         cmd,
-        textMesh.iBuff.handle,
+        textIndexBuffer.handle,
         0,
         VK_INDEX_TYPE_UINT32 //FIXME: should be 16
     );
@@ -160,5 +196,4 @@ void displayLine(
         textIndexCount,
         1, 0, 0, 0
     );
-    currentLine++;
 }
