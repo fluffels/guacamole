@@ -160,7 +160,9 @@ WinMain(
 
     // Load fonts.
     stbtt_bakedchar bakedChars[96];
+    VulkanSampler fontAtlas = {};
     {
+        // FIXME
         // auto fontFile = openFile("./FiraCode-Bold.tff", "r");
         auto fontFile = openFile("c:/windows/fonts/times.ttf", "r");
         auto ttfBuffer = new u8[1 << 20];
@@ -179,7 +181,6 @@ WinMain(
             bakedChars
         );
         delete[] ttfBuffer;
-        VulkanSampler sampler = {};
         uploadTexture(
             vk,
             fontWidth,
@@ -187,7 +188,7 @@ WinMain(
             VK_FORMAT_R8_UNORM,
             bitmap,
             fontWidth * fontHeight,
-            sampler
+            fontAtlas
         );
     }
 
@@ -277,6 +278,22 @@ WinMain(
         );
     }
 
+    VulkanPipeline textPipeline;
+    {
+        initVKPipeline(
+            vk,
+            "text",
+            textPipeline
+        );
+        updateCombinedImageSampler(
+            vk.device,
+            textPipeline.descriptorSet,
+            0,
+            &fontAtlas,
+            1
+        );
+    }
+
     // Initialize DirectInput.
     DirectInput directInput(instance);
     auto mouse = directInput.mouse;
@@ -339,57 +356,73 @@ WinMain(
 
         // Render.
         VkCommandBuffer cmd;
-        createCommandBuffers(vk.device, vk.cmdPool, 1, &cmd);
-        beginFrameCommandBuffer(cmd);
+        {
+            createCommandBuffers(vk.device, vk.cmdPool, 1, &cmd);
+            beginFrameCommandBuffer(cmd);
 
-        VkClearValue colorClear;
-        colorClear.color = {};
-        VkClearValue depthClear;
-        depthClear.depthStencil = { 1.f, 0 };
-        VkClearValue clears[] = { colorClear, depthClear };
+            VkClearValue colorClear;
+            colorClear.color = {};
+            VkClearValue depthClear;
+            depthClear.depthStencil = {1.f, 0};
+            VkClearValue clears[] = {colorClear, depthClear};
 
-        VkRenderPassBeginInfo beginInfo = {};
-        beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        beginInfo.clearValueCount = 2;
-        beginInfo.pClearValues = clears;
-        beginInfo.framebuffer = vk.swap.framebuffers[swapImageIndex];
-        beginInfo.renderArea.extent = vk.swap.extent;
-        beginInfo.renderArea.offset = {0, 0};
-        beginInfo.renderPass = vk.renderPass;
+            VkRenderPassBeginInfo beginInfo = {};
+            beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            beginInfo.clearValueCount = 2;
+            beginInfo.pClearValues = clears;
+            beginInfo.framebuffer = vk.swap.framebuffers[swapImageIndex];
+            beginInfo.renderArea.extent = vk.swap.extent;
+            beginInfo.renderArea.offset = {0, 0};
+            beginInfo.renderPass = vk.renderPass;
 
-        vkCmdBeginRenderPass(cmd, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdBeginRenderPass(cmd, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(
-            cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            defaultPipeline.handle
-        );
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindDescriptorSets(
-            cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            defaultPipeline.layout,
-            0, 1,
-            &defaultPipeline.descriptorSet,
-            0, nullptr
-        );
-        for (auto & computedBuffer: computedBuffers) {
-            vkCmdBindVertexBuffers(
+            vkCmdBindPipeline(
                 cmd,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                defaultPipeline.handle
+            );
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindDescriptorSets(
+                cmd,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                defaultPipeline.layout,
                 0, 1,
-                &computedBuffer.handle,
-                offsets
+                &defaultPipeline.descriptorSet,
+                0, nullptr
             );
-            vkCmdDraw(
+            for (auto &computedBuffer: computedBuffers) {
+                vkCmdBindVertexBuffers(
+                    cmd,
+                    0, 1,
+                    &computedBuffer.handle,
+                    offsets
+                );
+                vkCmdDraw(
+                    cmd,
+                    computedVertexCount,
+                    1,
+                    0,
+                    0
+                );
+            }
+
+            vkCmdBindPipeline(
                 cmd,
-                computedVertexCount,
-                1,
-                0,
-                0
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                textPipeline.handle
             );
+            vkCmdBindDescriptorSets(
+                cmd,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                textPipeline.layout,
+                0, 1, &textPipeline.descriptorSet,
+                0, nullptr
+            );
+
+            vkCmdEndRenderPass(cmd);
+            VKCHECK(vkEndCommandBuffer(cmd))
         }
-        vkCmdEndRenderPass(cmd);
-        VKCHECK(vkEndCommandBuffer(cmd))
 
         // Present
         VkSubmitInfo submitInfo = {};
