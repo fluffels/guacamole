@@ -160,4 +160,5 @@ void displayLine(
         textIndexCount,
         1, 0, 0, 0
     );
+    currentLine++;
 }

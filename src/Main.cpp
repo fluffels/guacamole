@@ -369,8 +369,22 @@ WinMain(
                 );
             }
 
+            currentLine = 0;
             char buffer[2048];
             sprintf_s(buffer, "%.4fs", frameTime); //@error
+            displayLine(vk, cmd, buffer);
+            sprintf_s(
+                buffer, "%.4fx %.4fy %.4fz",
+                uniforms.eye.x, uniforms.eye.y, uniforms.eye.z
+            ); //@error
+            displayLine(vk, cmd, buffer);
+            sprintf_s(
+                buffer, "%.4fx %.4fy %.4fz %.4fw",
+                uniforms.rotation.x,
+                uniforms.rotation.y,
+                uniforms.rotation.z,
+                uniforms.rotation.w
+            ); //@error
             displayLine(vk, cmd, buffer);
 
             vkCmdEndRenderPass(cmd);
