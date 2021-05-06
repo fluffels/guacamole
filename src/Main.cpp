@@ -165,7 +165,8 @@ WinMain(
     initText(vk);
 
     Chunk chunk = {};
-    generate(vk, chunk);
+    Vec3i chunkCoord = {0, 0, 0};
+    generate(vk, chunkCoord, chunk);
     INFO("Vertex buffers filled");
 
     // Setup pipelines.

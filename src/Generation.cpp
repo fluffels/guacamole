@@ -1,11 +1,11 @@
 struct Chunk {
-    Vec3i chunkCoord;
+    Vec3i coord;
     VulkanBuffer vertexBuffer;
     u32 vertexCount;
 };
 
-void generate(Vulkan& vk, Chunk& chunk) {
-    Vec3i chunkCoord = {0, 0, 0};
+void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
+    chunk.coord = coord;
     // Init & execute compute shader.
     VulkanBuffer computeBuffer = {};
     const u32 computeWidth = 32;
@@ -37,7 +37,7 @@ void generate(Vulkan& vk, Chunk& chunk) {
             computeBuffer.handle
         );
         Params params = {
-            {chunkCoord.x * 32.f, chunkCoord.y * 32.f, chunkCoord.z * 32.f, 0}
+            {coord.x * 32.f, coord.y * 32.f, coord.z * 32.f, 0}
         };
         dispatchCompute(
             vk,
