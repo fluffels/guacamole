@@ -9,6 +9,7 @@ layout(location=0) out vec4 outColor;
 void main() {
     vec3 col = inColor.xyz + vec3(1, 1, 1);
     col /= 2;
-    col *= inLight;
+    float light = clamp(inLight + .3f, 0.f, 1.f);
+    col *= light;
     outColor = vec4(col, 1);
 }

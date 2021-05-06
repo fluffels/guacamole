@@ -202,12 +202,12 @@ WinMain(
                         computeWidth, computeHeight, computeDepth,
                         sizeof(params), &params
                     );
-                    // Have to wait here before we transfer ownership of the buffer.
-                    vkQueueWaitIdle(vk.computeQueue);
                     bufferIdx++;
                 }
             }
         }
+        // Have to wait here before we transfer ownership of the buffer.
+        vkQueueWaitIdle(vk.computeQueue);
         for (int i = 0; i < computedBufferCount; i++) {
             transferBufferOwnership(
                 vk.device,
