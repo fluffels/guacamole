@@ -34,6 +34,8 @@ struct Uniforms {
 #define STBI_NO_PIC
 #define STBI_NO_PNM
 #include "stb/stb_image.h"
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb/stb_truetype.h"
 
 #ifdef WIN32
 #include "jcwk/FileSystem.cpp"
@@ -156,6 +158,39 @@ WinMain(
     initVK(vk);
     INFO("Vulkan initialized")
 
+    // Load fonts.
+    stbtt_bakedchar bakedChars[96];
+    {
+        // auto fontFile = openFile("./FiraCode-Bold.tff", "r");
+        auto fontFile = openFile("c:/windows/fonts/times.ttf", "r");
+        auto ttfBuffer = new u8[1 << 20];
+        fread(ttfBuffer, 1, 1<<20, fontFile);
+        const u32 fontWidth = 512;
+        const u32 fontHeight = 512;
+        u8 bitmap[fontWidth * fontHeight];
+        stbtt_BakeFontBitmap(
+            ttfBuffer,
+            0,
+            32.f,
+            bitmap,
+            fontWidth,
+            fontHeight,
+            32, 96,
+            bakedChars
+        );
+        delete[] ttfBuffer;
+        VulkanSampler sampler = {};
+        uploadTexture(
+            vk,
+            fontWidth,
+            fontHeight,
+            VK_FORMAT_R8_UNORM,
+            bitmap,
+            fontWidth * fontHeight,
+            sampler
+        );
+    }
+
     // Init & execute compute shader.
     const size_t computedBufferCount = 3 * 3 * 3;
     VulkanBuffer computedBuffers[computedBufferCount] = {};
@@ -223,11 +258,12 @@ WinMain(
             );
         }
     }
+    // Wait for transfer to complete.
+    vkDeviceWaitIdle(vk.device);
 
-    // Record command buffers.
-    VkCommandBuffer* cmds = nullptr;
+    // Setup pipelines.
+    VulkanPipeline defaultPipeline;
     {
-        VulkanPipeline defaultPipeline;
         initVKPipeline(
             vk,
             "default",
@@ -239,65 +275,6 @@ WinMain(
             0,
             vk.uniforms.handle
         );
-
-        u32 framebufferCount = vk.swap.images.size();
-        arrsetlen(cmds, framebufferCount);
-        createCommandBuffers(vk.device, vk.cmdPool, framebufferCount, cmds);
-        for (size_t swapIdx = 0; swapIdx < framebufferCount; swapIdx++) {
-            auto& cmd = cmds[swapIdx];
-            beginFrameCommandBuffer(cmd);
-
-            VkClearValue colorClear;
-            colorClear.color = {};
-            VkClearValue depthClear;
-            depthClear.depthStencil = { 1.f, 0 };
-            VkClearValue clears[] = { colorClear, depthClear };
-
-            VkRenderPassBeginInfo beginInfo = {};
-            beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            beginInfo.clearValueCount = 2;
-            beginInfo.pClearValues = clears;
-            beginInfo.framebuffer = vk.swap.framebuffers[swapIdx];
-            beginInfo.renderArea.extent = vk.swap.extent;
-            beginInfo.renderArea.offset = {0, 0};
-            beginInfo.renderPass = vk.renderPass;
-
-            vkCmdBeginRenderPass(cmd, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            vkCmdBindPipeline(
-                cmd,
-                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                defaultPipeline.handle
-            );
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindDescriptorSets(
-                cmd,
-                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                defaultPipeline.layout,
-                0, 1,
-                &defaultPipeline.descriptorSet,
-                0, nullptr
-            );
-            for (size_t i = 0; i < computedBufferCount; i++) {
-                vkCmdBindVertexBuffers(
-                    cmd,
-                    0, 1,
-                    &computedBuffers[i].handle,
-                    offsets
-                );
-                vkCmdDraw(
-                    cmd,
-                    computedVertexCount,
-                    1,
-                    0,
-                    0
-                );
-            }
-
-            vkCmdEndRenderPass(cmd);
-
-            VKCHECK(vkEndCommandBuffer(cmd))
-        }
     }
 
     // Initialize DirectInput.
@@ -342,9 +319,109 @@ WinMain(
             DispatchMessage(&msg); 
         } while(!done && messageAvailable);
 
-        // Render frame.
-        present(vk, cmds, 1);
-        
+        // Acquire swap image.
+        uint32_t swapImageIndex = 0;
+        auto result = vkAcquireNextImageKHR(
+            vk.device,
+            vk.swap.handle,
+            std::numeric_limits<uint64_t>::max(),
+            vk.swap.imageReady,
+            VK_NULL_HANDLE,
+            &swapImageIndex
+        );
+        if ((result == VK_SUBOPTIMAL_KHR) ||
+            (result == VK_ERROR_OUT_OF_DATE_KHR)) {
+            // TODO(jan): implement resize
+            ERR("could not acquire next image");
+        } else if (result != VK_SUCCESS) {
+            ERR("could not acquire next image");
+        }
+
+        // Render.
+        VkCommandBuffer cmd;
+        createCommandBuffers(vk.device, vk.cmdPool, 1, &cmd);
+        beginFrameCommandBuffer(cmd);
+
+        VkClearValue colorClear;
+        colorClear.color = {};
+        VkClearValue depthClear;
+        depthClear.depthStencil = { 1.f, 0 };
+        VkClearValue clears[] = { colorClear, depthClear };
+
+        VkRenderPassBeginInfo beginInfo = {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        beginInfo.clearValueCount = 2;
+        beginInfo.pClearValues = clears;
+        beginInfo.framebuffer = vk.swap.framebuffers[swapImageIndex];
+        beginInfo.renderArea.extent = vk.swap.extent;
+        beginInfo.renderArea.offset = {0, 0};
+        beginInfo.renderPass = vk.renderPass;
+
+        vkCmdBeginRenderPass(cmd, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(
+            cmd,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            defaultPipeline.handle
+        );
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindDescriptorSets(
+            cmd,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            defaultPipeline.layout,
+            0, 1,
+            &defaultPipeline.descriptorSet,
+            0, nullptr
+        );
+        for (auto & computedBuffer: computedBuffers) {
+            vkCmdBindVertexBuffers(
+                cmd,
+                0, 1,
+                &computedBuffer.handle,
+                offsets
+            );
+            vkCmdDraw(
+                cmd,
+                computedVertexCount,
+                1,
+                0,
+                0
+            );
+        }
+        vkCmdEndRenderPass(cmd);
+        VKCHECK(vkEndCommandBuffer(cmd))
+
+        // Present
+        VkSubmitInfo submitInfo = {};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &cmd;
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = &vk.swap.imageReady;
+        VkPipelineStageFlags waitStages[] = {
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+        };
+        submitInfo.pWaitDstStageMask = waitStages;
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &vk.swap.cmdBufferDone;
+        vkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
+        VkPresentInfoKHR presentInfo = {};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &vk.swap.handle;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = &vk.swap.cmdBufferDone;
+        presentInfo.pImageIndices = &swapImageIndex;
+        VKCHECK(vkQueuePresentKHR(vk.queue, &presentInfo));
+        vkDeviceWaitIdle(vk.device); //@perf
+
+        vkFreeCommandBuffers(
+            vk.device,
+            vk.cmdPool,
+            1,
+            &cmd
+        );
+
         // Frame rate independent movement stuff.
         QueryPerformanceCounter(&frameEnd);
         float frameTime = (float)(frameEnd.QuadPart - frameStart.QuadPart) /
@@ -377,7 +454,6 @@ WinMain(
 
         updateUniforms(vk, &uniforms, sizeof(uniforms));
     }
-    arrfree(cmds);
 
     return errorCode;
 }
