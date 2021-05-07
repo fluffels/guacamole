@@ -82,6 +82,11 @@ void chunkPack(
     }
 
     chunk.vertexCount = vertexCount;
+
+    INFO(
+        "Packed chunk (%dx %dy %dz)",
+        chunk.coord.x, chunk.coord.y, chunk.coord.z
+    );
 }
 
 struct PackParams {
@@ -105,7 +110,15 @@ void generateChunk(
     chunk = {};
     chunk.coord = chunkCoord;
 
+    INFO(
+        "Generating chunk (%dx %dy %dz)",
+        chunk.coord.x, chunk.coord.y, chunk.coord.z
+    );
     chunkTriangulate(vk, chunk);
+    INFO(
+        "Triangulated chunk (%dx %dy %dz)",
+        chunk.coord.x, chunk.coord.y, chunk.coord.z
+    );
     auto params = new PackParams;
     params->vk = &vk;
     params->chunk = &chunk;
