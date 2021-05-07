@@ -56,46 +56,6 @@ const float MOUSE_SENSITIVITY = 0.1f;
 const float JOYSTICK_SENSITIVITY = 5;
 bool keyboard[VK_OEM_CLEAR] = {};
 
-struct GenerationParams {
-    Vulkan* vk;
-    Vec3i* chunkCoord;
-    Chunk* chunk;
-};
-
-DWORD WINAPI GenerationThread(LPVOID param) {
-    auto params = (GenerationParams*)param;
-    generate(*params->vk, *params->chunkCoord, *params->chunk);
-    delete params;
-    return 0;
-}
-
-void generateChunk(
-    Vulkan& vk,
-    Vec3i& chunkCoord,
-    Chunk& chunk
-) {
-    INFO(
-        "Generating chunk (%dx %dy %dz)",
-        chunkCoord.x, chunkCoord.y, chunkCoord.z
-    );
-    auto params = new GenerationParams;
-    params->vk = &vk;
-    params->chunkCoord = &chunkCoord;
-    params->chunk = &chunk;
-    CreateThread(
-        NULL,
-        0,
-        GenerationThread,
-        params,
-        0,
-        NULL
-    );
-    INFO(
-        "Generated chunk (%dx %dy %dz)",
-        chunkCoord.x, chunkCoord.y, chunkCoord.z
-    );
-}
-
 LRESULT __stdcall
 VKAPI_CALL WindowProc(
     HWND    window,
@@ -204,10 +164,11 @@ WinMain(
 
     initText(vk);
 
-    vector<Chunk> chunks;
-    auto& chunk = chunks.emplace_back();
+    vector<Chunk> chunks(2);
     Vec3i chunkCoord = {0, 0, 0};
-    generateChunk(vk, chunkCoord, chunk);
+    generateChunk(vk, chunkCoord, chunks[0]);
+    chunkCoord = {1, 0, 0};
+    generateChunk(vk, chunkCoord, chunks[1]);
 
     // Setup pipelines.
     VulkanPipeline defaultPipeline;

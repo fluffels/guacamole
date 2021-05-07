@@ -1,5 +1,6 @@
 struct Chunk {
     Vec3i coord;
+    VulkanBuffer computeBuffer;
     VulkanBuffer vertexBuffer;
     u32 vertexCount;
 };
@@ -13,10 +14,12 @@ const u32 computeVertexCount = computeVerticesPerExecution * computeCount;
 const u32 computeVertexWidth = sizeof(Vertex);
 const int computeSize = computeVertexCount * computeVertexWidth;
 
-void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
-    chunk.coord = coord;
+void chunkTriangulate(Vulkan& vk, Chunk& chunk) {
+    INFO(
+        "Triangulating chunk (%dx %dy %dz)",
+        chunk.coord.x, chunk.coord.y, chunk.coord.z
+    );
     // Init & execute compute shader.
-    VulkanBuffer computeBuffer = {};
     {
         VulkanPipeline pipeline;
         initVKPipelineCompute(
@@ -29,16 +32,16 @@ void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
             vk.memories,
             vk.computeQueueFamily,
             computeSize,
-            computeBuffer
+            chunk.computeBuffer
         );
         updateStorageBuffer(
             vk.device,
             pipeline.descriptorSet,
             0,
-            computeBuffer.handle
+            chunk.computeBuffer.handle
         );
         Params params = {
-            {coord.x * 32.f, coord.y * 32.f, coord.z * 32.f, 0}
+            {chunk.coord.x * 32.f, chunk.coord.y * 32.f, chunk.coord.z * 32.f, 0}
         };
         dispatchCompute(
             vk,
@@ -48,18 +51,31 @@ void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
         );
         vkQueueWaitIdle(vk.computeQueue);
     }
+    INFO(
+        "Triangulated chunk (%dx %dy %dz)",
+        chunk.coord.x, chunk.coord.y, chunk.coord.z
+    );
+}
 
+void chunkPack(
+    Vulkan& vk,
+    Chunk& chunk
+) {
+    INFO(
+        "Packing chunk (%dx %dy %dz)",
+        chunk.coord.x, chunk.coord.y, chunk.coord.z
+    );
     createVertexBuffer(
         vk.device,
         vk.memories,
         vk.queueFamily,
-        computeSize,
+        computeSize, //TODO: this is way too big
         chunk.vertexBuffer
     );
 
     u32 vertexCount = 0;
     {
-        auto src = (Vertex*)mapMemory(vk.device, computeBuffer.memory);
+        auto src = (Vertex*)mapMemory(vk.device, chunk.computeBuffer.memory);
         auto dst = (Vertex*)mapMemory(vk.device, chunk.vertexBuffer.memory);
         for (int it = 0; it < computeVertexCount; it++) {
             if ((src->position.x != 0.f) ||
@@ -71,10 +87,62 @@ void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
             }
             src++;
         }
-        unMapMemory(vk.device, computeBuffer.memory);
+        unMapMemory(vk.device, chunk.computeBuffer.memory);
         unMapMemory(vk.device, chunk.vertexBuffer.memory);
-        destroyBuffer(vk, computeBuffer);
+        destroyBuffer(vk, chunk.computeBuffer);
+        chunk.computeBuffer = {};
     }
 
     chunk.vertexCount = vertexCount;
+
+    INFO(
+        "Packed chunk (%dx %dy %dz)",
+        chunk.coord.x, chunk.coord.y, chunk.coord.z
+    );
+}
+
+struct PackParams {
+    Vulkan* vk;
+    Chunk* chunk;
+};
+
+DWORD WINAPI PackThread(LPVOID param) {
+    auto params = (PackParams*)param;
+    auto& chunk = *params->chunk;
+    INFO(
+        "PackThread: chunk (%dx %dy %dz), params = %p, vk.handle = %d",
+        chunk.coord.x, chunk.coord.y, chunk.coord.z, param, params->vk->handle
+    );
+    chunkPack(*params->vk, *params->chunk);
+    delete params;
+    return 0;
+}
+
+void generateChunk(
+    Vulkan& vk,
+    Vec3i chunkCoord,
+    Chunk& chunk
+) {
+    chunk = {};
+    chunk.coord = chunkCoord;
+
+    chunkTriangulate(vk, chunk);
+#if 1
+    auto params = new PackParams;
+    params->vk = &vk;
+    params->chunk = &chunk;
+    INFO(
+        "generate: chunk (%dx %dy %dz), params = %p, vk.handle = %d",
+        params->chunk->coord.x, params->chunk->coord.y, params->chunk->coord.z, params, params->vk->handle);
+    CreateThread(
+        NULL,
+        0,
+        PackThread,
+        params,
+        0,
+        NULL
+    );
+#else
+    chunkPack(vk, chunk);
+#endif
 }
