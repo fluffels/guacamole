@@ -15,10 +15,6 @@ const u32 computeVertexWidth = sizeof(Vertex);
 const int computeSize = computeVertexCount * computeVertexWidth;
 
 void chunkTriangulate(Vulkan& vk, Chunk& chunk) {
-    INFO(
-        "Triangulating chunk (%dx %dy %dz)",
-        chunk.coord.x, chunk.coord.y, chunk.coord.z
-    );
     // Init & execute compute shader.
     {
         VulkanPipeline pipeline;
@@ -51,20 +47,12 @@ void chunkTriangulate(Vulkan& vk, Chunk& chunk) {
         );
         vkQueueWaitIdle(vk.computeQueue);
     }
-    INFO(
-        "Triangulated chunk (%dx %dy %dz)",
-        chunk.coord.x, chunk.coord.y, chunk.coord.z
-    );
 }
 
 void chunkPack(
     Vulkan& vk,
     Chunk& chunk
 ) {
-    INFO(
-        "Packing chunk (%dx %dy %dz)",
-        chunk.coord.x, chunk.coord.y, chunk.coord.z
-    );
     createVertexBuffer(
         vk.device,
         vk.memories,
@@ -94,11 +82,6 @@ void chunkPack(
     }
 
     chunk.vertexCount = vertexCount;
-
-    INFO(
-        "Packed chunk (%dx %dy %dz)",
-        chunk.coord.x, chunk.coord.y, chunk.coord.z
-    );
 }
 
 struct PackParams {
@@ -109,10 +92,6 @@ struct PackParams {
 DWORD WINAPI PackThread(LPVOID param) {
     auto params = (PackParams*)param;
     auto& chunk = *params->chunk;
-    INFO(
-        "PackThread: chunk (%dx %dy %dz), params = %p, vk.handle = %d",
-        chunk.coord.x, chunk.coord.y, chunk.coord.z, param, params->vk->handle
-    );
     chunkPack(*params->vk, *params->chunk);
     delete params;
     return 0;
@@ -127,13 +106,9 @@ void generateChunk(
     chunk.coord = chunkCoord;
 
     chunkTriangulate(vk, chunk);
-#if 1
     auto params = new PackParams;
     params->vk = &vk;
     params->chunk = &chunk;
-    INFO(
-        "generate: chunk (%dx %dy %dz), params = %p, vk.handle = %d",
-        params->chunk->coord.x, params->chunk->coord.y, params->chunk->coord.z, params, params->vk->handle);
     CreateThread(
         NULL,
         0,
@@ -142,7 +117,4 @@ void generateChunk(
         0,
         NULL
     );
-#else
-    chunkPack(vk, chunk);
-#endif
 }
