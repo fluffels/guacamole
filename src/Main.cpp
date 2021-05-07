@@ -56,6 +56,46 @@ const float MOUSE_SENSITIVITY = 0.1f;
 const float JOYSTICK_SENSITIVITY = 5;
 bool keyboard[VK_OEM_CLEAR] = {};
 
+struct GenerationParams {
+    Vulkan* vk;
+    Vec3i* chunkCoord;
+    Chunk* chunk;
+};
+
+DWORD WINAPI GenerationThread(LPVOID param) {
+    auto params = (GenerationParams*)param;
+    generate(*params->vk, *params->chunkCoord, *params->chunk);
+    delete params;
+    return 0;
+}
+
+void generateChunk(
+    Vulkan& vk,
+    Vec3i& chunkCoord,
+    Chunk& chunk
+) {
+    INFO(
+        "Generating chunk (%dx %dy %dz)",
+        chunkCoord.x, chunkCoord.y, chunkCoord.z
+    );
+    GenerationParams* params = new GenerationParams;
+    params->vk = &vk;
+    params->chunkCoord = &chunkCoord;
+    params->chunk = &chunk;
+    CreateThread(
+        NULL,
+        0,
+        GenerationThread,
+        params,
+        0,
+        NULL
+    );
+    INFO(
+        "Generated chunk (%dx %dy %dz)",
+        chunkCoord.x, chunkCoord.y, chunkCoord.z
+    );
+}
+
 LRESULT __stdcall
 VKAPI_CALL WindowProc(
     HWND    window,
@@ -165,15 +205,9 @@ WinMain(
     initText(vk);
 
     vector<Chunk> chunks;
-    for (int x = 0; x < 3; x++) {
-        for (int y = 0; y < 3; y++) {
-            for (int z = 0; z < 3; z++) {
-                Vec3i chunkCoord = {x, y, z};
-                generate(vk, chunkCoord, chunks.emplace_back());
-            }
-        }
-    }
-    INFO("Vertex buffers filled");
+    auto& chunk = chunks.emplace_back();
+    Vec3i chunkCoord = {0, 0, 0};
+    generateChunk(vk, chunkCoord, chunk);
 
     // Setup pipelines.
     VulkanPipeline defaultPipeline;
@@ -301,19 +335,21 @@ WinMain(
                 0, nullptr
             );
             for (auto& chunk: chunks) {
-                vkCmdBindVertexBuffers(
-                    cmd,
-                    0, 1,
-                    &chunk.vertexBuffer.handle,
-                    offsets
-                );
-                vkCmdDraw(
-                    cmd,
-                    chunk.vertexCount,
-                    1,
-                    0,
-                    0
-                );
+                if (chunk.vertexCount) {
+                    vkCmdBindVertexBuffers(
+                        cmd,
+                        0, 1,
+                        &chunk.vertexBuffer.handle,
+                        offsets
+                    );
+                    vkCmdDraw(
+                        cmd,
+                        chunk.vertexCount,
+                        1,
+                        0,
+                        0
+                    );
+                }
             }
 
             startText();

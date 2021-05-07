@@ -57,7 +57,7 @@ void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
         chunk.vertexBuffer
     );
 
-    chunk.vertexCount = 0;
+    u32 vertexCount = 0;
     {
         auto src = (Vertex*)mapMemory(vk.device, computeBuffer.memory);
         auto dst = (Vertex*)mapMemory(vk.device, chunk.vertexBuffer.memory);
@@ -67,7 +67,7 @@ void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
                 (src->position.z != 0.f)) {
                 *dst = *src;
                 dst++;
-                chunk.vertexCount++;
+                vertexCount++;
             }
             src++;
         }
@@ -75,4 +75,6 @@ void generate(Vulkan& vk, Vec3i& coord, Chunk& chunk) {
         unMapMemory(vk.device, chunk.vertexBuffer.memory);
         destroyBuffer(vk, computeBuffer);
     }
+
+    chunk.vertexCount = vertexCount;
 }
