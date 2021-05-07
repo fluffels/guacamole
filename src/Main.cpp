@@ -164,11 +164,12 @@ WinMain(
 
     initText(vk);
 
-    vector<Chunk> chunks(2);
-    Vec3i chunkCoord = {0, 0, 0};
-    generateChunk(vk, chunkCoord, chunks[0]);
-    chunkCoord = {1, 0, 0};
-    generateChunk(vk, chunkCoord, chunks[1]);
+    // FIXME: This has a static size at the moment which is not optimal because
+    // ideally we'd like to have an infinitely expanding world. The reason it
+    // can't arbitrarily expand is because that relocates some of the pointers
+    // used in the threads spawned by the generation code.
+    u32 nextChunkIdx = 0;
+    vector<Chunk> chunks(1 << 10);
 
     // Setup pipelines.
     VulkanPipeline defaultPipeline;
@@ -194,7 +195,6 @@ WinMain(
     float rotY = 0;
     float rotX = 0;
     Uniforms uniforms = {};
-    uniforms.eye.z = -2.f;
     matrixProjection(
         screenWidth,
         screenHeight,
@@ -214,7 +214,7 @@ WinMain(
     QueryPerformanceCounter(&firstFrame);
     LARGE_INTEGER frameStart = {};
     LARGE_INTEGER frameEnd = {};
-    Vec3i currentChunk = {};
+    Vec3i currentChunkCoord = {};
     float frameTime = 0;
     float averageFrameTime = 0;
     float frameCount = 0;
@@ -239,6 +239,25 @@ WinMain(
             }
             DispatchMessage(&msg); 
         } while(!done && messageAvailable);
+
+        currentChunkCoord.x = (i32)floor(uniforms.eye.x / computeWidth);
+        currentChunkCoord.y = (i32)floor(uniforms.eye.y / computeWidth);
+        currentChunkCoord.z = (i32)floor(uniforms.eye.z / computeWidth);
+        bool chunkAvailable = false;
+
+        for (int chunkIdx = 0; chunkIdx < nextChunkIdx; chunkIdx++) {
+            auto& chunk = chunks[chunkIdx];
+            // FIXME: this search is probably kinda slow.
+            if (vectorEquals(chunk.coord, currentChunkCoord)) {
+                chunkAvailable = true;
+                break;
+            }
+        }
+
+        if (!chunkAvailable) {
+            generateChunk(vk, currentChunkCoord, chunks[nextChunkIdx]);
+            nextChunkIdx++;
+        }
 
         // Acquire swap image.
         uint32_t swapImageIndex = 0;
@@ -295,7 +314,8 @@ WinMain(
                 &defaultPipeline.descriptorSet,
                 0, nullptr
             );
-            for (auto& chunk: chunks) {
+            for (u32 chunkIdx = 0; chunkIdx < nextChunkIdx; chunkIdx++) {
+                auto& chunk = chunks[chunkIdx];
                 if (chunk.vertexCount) {
                     vkCmdBindVertexBuffers(
                         cmd,
@@ -322,7 +342,7 @@ WinMain(
             );
             display(
                 "%dx %dy %dz",
-                currentChunk.x, currentChunk.y, currentChunk.z
+                currentChunkCoord.x, currentChunkCoord.y, currentChunkCoord.z
             );
             display(
                 "%.4fx %.4fy %.4fz %.4fw",
@@ -401,10 +421,6 @@ WinMain(
         if (keyboard['D']) {
             movePerpendicularToQuaternion(moveDelta, uniforms.rotation, uniforms.eye);
         }
-
-        currentChunk.x = (i32)floor(uniforms.eye.x / computeWidth);
-        currentChunk.y = (i32)floor(uniforms.eye.y / computeWidth);
-        currentChunk.z = (i32)floor(uniforms.eye.z / computeWidth);
 
         updateUniforms(vk, &uniforms, sizeof(uniforms));
     }
