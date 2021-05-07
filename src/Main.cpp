@@ -78,7 +78,7 @@ void generateChunk(
         "Generating chunk (%dx %dy %dz)",
         chunkCoord.x, chunkCoord.y, chunkCoord.z
     );
-    GenerationParams* params = new GenerationParams;
+    auto params = new GenerationParams;
     params->vk = &vk;
     params->chunkCoord = &chunkCoord;
     params->chunk = &chunk;
