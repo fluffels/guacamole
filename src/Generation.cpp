@@ -15,6 +15,7 @@ struct GenerateWorkItem {
 
 HANDLE generateWorkQueueMutex;
 std::queue<GenerateWorkItem> generateWorkQueue;
+HANDLE generateWorkSemaphore;
 
 u32 chunksTriangulated = 0;
 float triangulationTime = 0.f;
@@ -36,7 +37,10 @@ void generatePushWorkItem(GenerateWorkItem &workItem) {
             FATAL("generate thread crashed");
         case WAIT_OBJECT_0:
             generateWorkQueue.push(workItem);
+            // TODO: error handling
             ReleaseMutex(generateWorkQueueMutex);
+            // TODO: error handling
+            ReleaseSemaphore(generateWorkSemaphore, 1, nullptr);
             break;
         case WAIT_TIMEOUT:
             FATAL("generate thread hung");
@@ -192,14 +196,24 @@ void generateChunk(
 
 [[noreturn]] DWORD WINAPI GenerateThread(LPVOID param) {
     while (true) {
-        // TODO: does this also require a mutex?
-        while (!generateWorkQueue.empty()) {
-            auto workItem = generatePopWorkItem();
-            generateChunk(
-                *workItem.vk,
-                workItem.coord,
-                *workItem.chunk
-            );
+        // NOTE: Wait for work to be enqueued so the thread doesn't just spin.
+        switch (WaitForSingleObject(generateWorkSemaphore, INFINITE)) {
+            case WAIT_ABANDONED: FATAL("semaphore abandoned");
+            case WAIT_OBJECT_0: {
+                while (!generateWorkQueue.empty()) {
+                    auto workItem = generatePopWorkItem();
+                    generateChunk(
+                        *workItem.vk,
+                        workItem.coord,
+                        *workItem.chunk
+                    );
+                }
+            }
+            break;
+            case WAIT_TIMEOUT: FATAL("semaphore timeout");
+                // TODO: Call GetLastError here and FormatMessage for a more
+                // descriptive error message.
+            case WAIT_FAILED: FATAL("unknown error");
         }
     }
 }
@@ -212,12 +226,21 @@ void initGenerate() {
     );
     CHECK(generateWorkQueueMutex, "Could not create mutex");
 
+    generateWorkSemaphore = CreateSemaphore(
+        nullptr,
+        0,
+        // TODO: bogus value for lMaximumCount.
+        1 < 10,
+        "generateWork"
+    );
+    CHECK(generateWorkSemaphore, "Could not create semaphore");
+
     CreateThread(
-        NULL,
+        nullptr,
         0,
         GenerateThread,
         nullptr,
         0,
-        NULL
+        nullptr
     );
 }
