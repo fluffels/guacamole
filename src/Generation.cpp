@@ -1,9 +1,20 @@
+#include <queue>
+
 struct Chunk {
     Vec3i coord;
     VulkanBuffer computeBuffer;
     VulkanBuffer vertexBuffer;
     u32 vertexCount;
 };
+
+struct GenerateWorkItem {
+    Vulkan* vk;
+    Vec3i coord;
+    Chunk* chunk;
+};
+
+HANDLE generateWorkQueueMutex;
+std::queue<GenerateWorkItem> generateWorkQueue;
 
 u32 chunksTriangulated = 0;
 float triangulationTime = 0.f;
@@ -18,6 +29,39 @@ const u32 computeVerticesPerExecution = 15;
 const u32 computeVertexCount = computeVerticesPerExecution * computeCount;
 const u32 computeVertexWidth = sizeof(Vertex);
 const int computeSize = computeVertexCount * computeVertexWidth;
+
+void generatePushWorkItem(GenerateWorkItem &workItem) {
+    switch (WaitForSingleObject(generateWorkQueueMutex, 1000)) {
+        case WAIT_ABANDONED:
+            FATAL("generate thread crashed");
+        case WAIT_OBJECT_0:
+            generateWorkQueue.push(workItem);
+            ReleaseMutex(generateWorkQueueMutex);
+            break;
+        case WAIT_TIMEOUT:
+            FATAL("generate thread hung");
+        case WAIT_FAILED:
+            // TODO: Call GetLastError here and FormatMessage for a more
+            // descriptive error message.
+            FATAL("unknown error");
+    }
+}
+
+GenerateWorkItem generatePopWorkItem() {
+    switch (WaitForSingleObject(generateWorkQueueMutex, 1000)) {
+        case WAIT_ABANDONED: FATAL("generate thread crashed");
+        case WAIT_OBJECT_0: {
+            auto workItem = generateWorkQueue.front();
+            generateWorkQueue.pop();
+            ReleaseMutex(generateWorkQueueMutex);
+            return workItem;
+        }
+        case WAIT_TIMEOUT: FATAL("generate thread hung");
+        // TODO: Call GetLastError here and FormatMessage for a more
+        // descriptive error message.
+        case WAIT_FAILED: FATAL("unknown error");
+    }
+}
 
 void chunkTriangulate(Vulkan& vk, Chunk& chunk) {
     START_TIMER(Triangulate);
@@ -141,6 +185,38 @@ void generateChunk(
         0,
         PackThread,
         params,
+        0,
+        NULL
+    );
+}
+
+[[noreturn]] DWORD WINAPI GenerateThread(LPVOID param) {
+    while (true) {
+        // TODO: does this also require a mutex?
+        while (!generateWorkQueue.empty()) {
+            auto workItem = generatePopWorkItem();
+            generateChunk(
+                *workItem.vk,
+                workItem.coord,
+                *workItem.chunk
+            );
+        }
+    }
+}
+
+void initGenerate() {
+    generateWorkQueueMutex = CreateMutex(
+        nullptr,
+        false,
+        "generateWorkQueue"
+    );
+    CHECK(generateWorkQueueMutex, "Could not create mutex");
+
+    CreateThread(
+        NULL,
+        0,
+        GenerateThread,
+        nullptr,
         0,
         NULL
     );

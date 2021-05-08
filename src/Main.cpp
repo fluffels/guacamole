@@ -164,6 +164,7 @@ WinMain(
     INFO("Vulkan initialized")
 
     initText(vk);
+    initGenerate();
 
     // FIXME: This has a static size at the moment which is not optimal because
     // ideally we'd like to have an infinitely expanding world. The reason it
@@ -256,7 +257,11 @@ WinMain(
         }
 
         if (!chunkAvailable) {
-            generateChunk(vk, currentChunkCoord, chunks[nextChunkIdx]);
+            GenerateWorkItem workItem = {};
+            workItem.vk = &vk;
+            workItem.coord = currentChunkCoord;
+            workItem.chunk = &chunks[nextChunkIdx];
+            generatePushWorkItem(workItem);
             nextChunkIdx++;
         }
 
