@@ -1,7 +1,7 @@
 .vs
 .vscode
 build/
-LOG
+LOG*
 *.spv
 RenderDoc.cap
 RemedyBG.rdbg

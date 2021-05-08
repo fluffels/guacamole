@@ -48,6 +48,7 @@ struct Uniforms {
 #include "jcwk/Vulkan.cpp"
 #endif
 
+#include "jcwk/Timer.h"
 #include "Text.cpp"
 #include "Generation.cpp"
 
@@ -426,6 +427,8 @@ WinMain(
     }
 
     INFO("Average frame time: %.2fms", averageFrameTime * 1000);
+    INFO("Average triangulation time: %.2fms", (triangulationTime / chunksTriangulated) * 1000);
+    INFO("Average pack time: %.2fms", (packTime / chunksPacked) * 1000);
 
     return errorCode;
 }

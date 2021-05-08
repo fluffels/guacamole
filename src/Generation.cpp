@@ -5,6 +5,11 @@ struct Chunk {
     u32 vertexCount;
 };
 
+u32 chunksTriangulated = 0;
+float triangulationTime = 0.f;
+u32 chunksPacked = 0;
+float packTime = 0.f;
+
 const u32 computeWidth = 32;
 const u32 computeHeight = computeWidth;
 const u32 computeDepth = computeWidth;
@@ -15,6 +20,7 @@ const u32 computeVertexWidth = sizeof(Vertex);
 const int computeSize = computeVertexCount * computeVertexWidth;
 
 void chunkTriangulate(Vulkan& vk, Chunk& chunk) {
+    START_TIMER(Triangulate);
     // Init & execute compute shader.
     {
         VulkanPipeline pipeline;
@@ -47,12 +53,16 @@ void chunkTriangulate(Vulkan& vk, Chunk& chunk) {
         );
         vkQueueWaitIdle(vk.computeQueue);
     }
+    END_TIMER(Triangulate);
+    triangulationTime += DELTA(Triangulate);
+    chunksTriangulated++;
 }
 
 void chunkPack(
     Vulkan& vk,
     Chunk& chunk
 ) {
+    START_TIMER(Pack);
     createVertexBuffer(
         vk.device,
         vk.memories,
@@ -87,6 +97,10 @@ void chunkPack(
         "Packed chunk (%dx %dy %dz)",
         chunk.coord.x, chunk.coord.y, chunk.coord.z
     );
+
+    END_TIMER(Pack);
+    packTime += DELTA(Pack);
+    chunksPacked++;
 }
 
 struct PackParams {
