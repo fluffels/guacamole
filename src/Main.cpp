@@ -189,6 +189,14 @@ WinMain(
         );
     }
 
+    // Generate first chunk.
+    GenerateWorkItem workItem = {};
+    workItem.vk = &vk;
+    workItem.coord = {0, 0, 0};
+    workItem.chunk = &chunks[0];
+    nextChunkIdx++;
+    generatePushWorkItem(workItem);
+
     // Initialize DirectInput.
     DirectInput directInput(instance);
     auto mouse = directInput.mouse;
@@ -245,24 +253,46 @@ WinMain(
         currentChunkCoord.x = (i32)floor(uniforms.eye.x / computeWidth);
         currentChunkCoord.y = (i32)floor(uniforms.eye.y / computeWidth);
         currentChunkCoord.z = (i32)floor(uniforms.eye.z / computeWidth);
-        bool chunkAvailable = false;
 
-        for (int chunkIdx = 0; chunkIdx < nextChunkIdx; chunkIdx++) {
-            auto& chunk = chunks[chunkIdx];
-            // FIXME: this search is probably kinda slow.
-            if (vectorEquals(chunk.coord, currentChunkCoord)) {
-                chunkAvailable = true;
-                break;
+        vector<Vec3i> requestedChunkCoords(3*3*3);
+        {
+            u32 i = 0;
+            for (i32 x = -1; x <= 1; x++) {
+                for (i32 y = -1; y <= 1; y++) {
+                    for (i32 z = -1; z <= 1; z++) {
+                        auto& coord = requestedChunkCoords[i];
+                        coord.x = currentChunkCoord.x + x;
+                        coord.y = currentChunkCoord.y + y;
+                        coord.z = currentChunkCoord.z + z;
+                        i++;
+                    }
+                }
             }
         }
 
-        if (!chunkAvailable) {
-            GenerateWorkItem workItem = {};
-            workItem.vk = &vk;
-            workItem.coord = currentChunkCoord;
-            workItem.chunk = &chunks[nextChunkIdx];
-            generatePushWorkItem(workItem);
-            nextChunkIdx++;
+        vector<Vec3i> chunksToGenerate;
+        for (auto& coord: requestedChunkCoords) {
+            bool chunkAvailable = false;
+
+            for (auto& chunk: chunks) {
+                // FIXME: this search is probably kinda slow.
+                if (vectorEquals(chunk.coord, coord)) {
+                    chunkAvailable = true;
+                    break;
+                }
+            }
+
+            if (!chunkAvailable) {
+                auto& chunk = chunks[nextChunkIdx];
+                chunk.coord = coord;
+                nextChunkIdx++;
+
+                GenerateWorkItem workItem = {};
+                workItem.vk = &vk;
+                workItem.coord = coord;
+                workItem.chunk = &chunk;
+                generatePushWorkItem(workItem);
+            }
         }
 
         // Acquire swap image.
@@ -347,8 +377,8 @@ WinMain(
                 uniforms.eye.x, uniforms.eye.y, uniforms.eye.z
             );
             display(
-                "%dx %dy %dz",
-                currentChunkCoord.x, currentChunkCoord.y, currentChunkCoord.z
+                "%dx %dy %dz (%d chunks)",
+                currentChunkCoord.x, currentChunkCoord.y, currentChunkCoord.z, nextChunkIdx
             );
             display(
                 "%.4fx %.4fy %.4fz %.4fw",
@@ -399,9 +429,7 @@ WinMain(
         QueryPerformanceCounter(&frameEnd);
         frameTime = (float)(frameEnd.QuadPart - frameStart.QuadPart) /
             (float)counterFrequency.QuadPart;
-        float totalTime = (float)(frameEnd.QuadPart - firstFrame.QuadPart) /
-            (float)counterFrequency.QuadPart;
-        averageFrameTime = totalTime / frameCount;
+        averageFrameTime = averageFrameTime * 0.99 + frameTime * 0.01;
         float moveDelta = DELTA_MOVE_PER_S * frameTime;
 
         // Mouse.
