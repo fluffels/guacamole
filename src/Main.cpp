@@ -50,6 +50,7 @@ struct Uniforms {
 
 #include "jcwk/Timer.h"
 #include "Text.cpp"
+#include "PerfGraph.cpp"
 #include "Generation.cpp"
 
 const float DELTA_MOVE_PER_S = 10.f;
@@ -164,6 +165,7 @@ WinMain(
     INFO("Vulkan initialized")
 
     initText(vk);
+    graphInit(vk);
     initGenerate();
 
     // FIXME: This has a static size at the moment which is not optimal because
@@ -228,6 +230,9 @@ WinMain(
     float frameTime = 0;
     float averageFrameTime = 0;
     float frameCount = 0;
+    auto frameTimes = new float[graph.barCount];
+    u32 lastFrameTimeIdx = 0;
+    u32 frameTimeIdx = 0;
     BOOL done = false;
     int errorCode = 0;
     while (!done) {
@@ -389,6 +394,8 @@ WinMain(
             );
             endText(vk, cmd);
 
+            graphDraw(vk, cmd, frameTimes, lastFrameTimeIdx);
+
             vkCmdEndRenderPass(cmd);
             VKCHECK(vkEndCommandBuffer(cmd))
         }
@@ -429,6 +436,9 @@ WinMain(
         QueryPerformanceCounter(&frameEnd);
         frameTime = (float)(frameEnd.QuadPart - frameStart.QuadPart) /
             (float)counterFrequency.QuadPart;
+        frameTimes[frameTimeIdx] = frameTime;
+        lastFrameTimeIdx = frameTimeIdx;
+        frameTimeIdx = (frameTimeIdx+1) % graph.barCount;
         averageFrameTime = averageFrameTime * 0.99 + frameTime * 0.01;
         float moveDelta = DELTA_MOVE_PER_S * frameTime;
 
