@@ -21,6 +21,10 @@ Each available chunk is then rendered in turn.
 - 🔲 Implement some form of culling, currently FPS decreases with each chunk generated
 - 🔲 Improve frame times during chunk generation
 - 🔲 Improve pack times, right now it is a very dumb linear scan.
+- 🔲 Use a thread pool for the short lived threads to cut down on overhead.
+- 🔲 Smooth out marching cubes by properly interpolating instead of just taking the halfway point.
+- 🔲 Use `meshoptimizer` to further optimize meshes.
+- 🔲 Smooth out marching cubes by calculating smoothed normals.
 
 ## Discussion
 
