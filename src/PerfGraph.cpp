@@ -1,13 +1,17 @@
 struct Graph {
     struct Vertex {
         Vec2 position;
+        Vec3 color;
     };
 
     VulkanPipeline pipeline = {};
     VulkanBuffer vertexBuffer = {};
     VulkanBuffer indexBuffer = {};
 
-    const u32 barCount = 500;
+    const float height = 300.f;
+    const float width = 1920.f;
+
+    const u32 barCount = int(width / 2);
     const u32 vertexCount = (barCount+1) * 4;
     const u32 indexCount = (barCount+1) * 6;
     const u32 vertexBufferSize = vertexCount * sizeof(Vertex);
@@ -55,23 +59,29 @@ void graphDraw(
 
     for (u32 i = 0; i < graph.barCount; i++) {
         u32 idx = (frameIdx + i) % graph.barCount;
-        float height = ((frameTimes[idx] * 1000) / 32) * 1000.f;
+        float rel = (frameTimes[idx] * 1000) / 32.f;
+        float height = rel * graph.height;
+        Vec3 color = {1 * rel, 1 * (1-rel), 0};
 
         // TODO: Fix hardcoded vals
         vertex->position.x = float(i)*2 + 0.f;
         vertex->position.y = 1080.f;
+        vertex->color = color;
         vertex++;
 
         vertex->position.x = float(i)*2 + 0.f;
         vertex->position.y = 1080.f - height;
+        vertex->color = color;
         vertex++;
 
         vertex->position.x = float(i)*2 + 1.f;
         vertex->position.y = 1080.f - height;
+        vertex->color = color;
         vertex++;
 
         vertex->position.x = float(i)*2 + 1.f;
         vertex->position.y = 1080.f;
+        vertex->color = color;
         vertex++;
 
         u32 baseIdx = i * 4;
@@ -84,21 +94,26 @@ void graphDraw(
     }
 
     {
-        float height = (16.f / 32.f) * 1000.f;
+        Vec3 color = {1, 0, 0};
+        float height = (16.f / 32.f) * graph.height;
         vertex->position.x = 0.f;
         vertex->position.y = 1080.f - height;
+        vertex->color = color;
         vertex++;
 
         vertex->position.x = graph.barCount * 2;
         vertex->position.y = 1080.f - height;
+        vertex->color = color;
         vertex++;
 
         vertex->position.x = graph.barCount * 2;
         vertex->position.y = 1080.f - height + 1;
+        vertex->color = color;
         vertex++;
 
         vertex->position.x = 0.f;
         vertex->position.y = 1080.f - height + 1;
+        vertex->color = color;
         vertex++;
 
         u32 baseIdx = graph.barCount * 4;
