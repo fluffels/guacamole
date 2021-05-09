@@ -4,7 +4,7 @@ Marching cubes from Perlin noise implemented in compute shader.
 
 ## Description
 
-Worker thread launches a compute shader that uses 3D perlin noise to generate iso surface data that is triangulated using marching cubes.
+Worker thread launches a compute shader that uses 3D Perlin noise to generate iso surface data that is triangulated using marching cubes.
 This triangulation is packed ("optimized") by short lived threads.
 Once the packing is done the triangulation is uploaded as a vertex buffer and treated as a "chunk".
 
@@ -20,6 +20,7 @@ Each available chunk is then rendered in turn.
 - 🔲 Fix crash that occurs after ~100 chunks (this is probably an out of memory error)
 - 🔲 Implement some form of culling, currently FPS decreases with each chunk generated
 - 🔲 Improve frame times during chunk generation
+- 🔲 Improve pack times, right now it is a very dumb linear scan.
 
 ## Discussion
 
