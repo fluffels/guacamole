@@ -256,12 +256,18 @@ WinMain(
         currentChunkCoord.y = (i32)floor(uniforms.eye.y / computeHeight);
         currentChunkCoord.z = (i32)floor(uniforms.eye.z / computeDepth);
 
-        vector<Vec3i> requestedChunkCoords(3*3*3);
+        vector<Vec3i> requestedChunkCoords;
         {
+            const i32 range = 4;
+            const i32 coordCount = (range+1)*(range+1)*(range+1);
+            requestedChunkCoords.resize(coordCount);
+
             u32 i = 0;
-            for (i32 x = -1; x <= 1; x++) {
-                for (i32 y = -1; y <= 1; y++) {
-                    for (i32 z = -1; z <= 1; z++) {
+            const i32 rangeMin = 0 - range/2;
+            const i32 rangeMax = 0 + range/2;
+            for (i32 x = rangeMin; x <= rangeMax; x++) {
+                for (i32 y = rangeMin; y <= rangeMax; y++) {
+                    for (i32 z = rangeMin; z <= rangeMax; z++) {
                         auto& coord = requestedChunkCoords[i];
                         coord.x = currentChunkCoord.x + x;
                         coord.y = currentChunkCoord.y + y;
