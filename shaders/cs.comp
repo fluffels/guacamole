@@ -353,10 +353,12 @@ void main() {
     }
 
     const uint verticesPerExecution = 15;
+    // TODO: receive this as a param
+    const uint width = 16;
     uint vertexIdx = 
-                  X * verticesPerExecution +
-             Z * 32 * verticesPerExecution +
-        Y * 32 * 32 * verticesPerExecution
+                        X * verticesPerExecution +
+                Z * width * verticesPerExecution +
+        Y * width * width * verticesPerExecution
     ;
     int triangleList[16] = caseIdxToTriangleList[caseIdx];
     for (uint triangleIdx = 0; triangleIdx < verticesPerExecution / 3; triangleIdx++) {

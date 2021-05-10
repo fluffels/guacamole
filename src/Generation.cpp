@@ -22,7 +22,7 @@ float triangulationTime = 0.f;
 u32 chunksPacked = 0;
 float packTime = 0.f;
 
-const u32 computeWidth = 32;
+const u32 computeWidth = 16;
 const u32 computeHeight = computeWidth;
 const u32 computeDepth = computeWidth;
 const u32 computeCount = computeWidth * computeHeight * computeDepth;
@@ -91,7 +91,12 @@ void chunkTriangulate(Vulkan& vk, Chunk& chunk) {
             chunk.computeBuffer.handle
         );
         Params params = {
-            {chunk.coord.x * 32.f, chunk.coord.y * 32.f, chunk.coord.z * 32.f, 0}
+            {
+                chunk.coord.x * (float)computeWidth,
+                chunk.coord.y * (float)computeHeight,
+                chunk.coord.z * (float)computeDepth,
+                0
+            }
         };
         dispatchCompute(
             vk,
