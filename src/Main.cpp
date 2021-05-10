@@ -256,8 +256,8 @@ WinMain(
         } while(!done && messageAvailable);
 
         currentChunkCoord.x = (i32)floor(uniforms.eye.x / computeWidth);
-        currentChunkCoord.y = (i32)floor(uniforms.eye.y / computeWidth);
-        currentChunkCoord.z = (i32)floor(uniforms.eye.z / computeWidth);
+        currentChunkCoord.y = (i32)floor(uniforms.eye.y / computeHeight);
+        currentChunkCoord.z = (i32)floor(uniforms.eye.z / computeDepth);
 
         vector<Vec3i> requestedChunkCoords(3*3*3);
         {
