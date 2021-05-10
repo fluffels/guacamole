@@ -15,6 +15,7 @@ layout(set=0, binding=0) buffer OutputBuffer {
 
 layout(push_constant) uniform PushConstants {
     vec4 baseOffset;
+    ivec4 dimensions;
 } params;
 
 /* See http://paulbourke.net/geometry/polygonise/marchingsource.cpp */
@@ -353,12 +354,10 @@ void main() {
     }
 
     const uint verticesPerExecution = 15;
-    // TODO: receive this as a param
-    const uint width = 16;
-    uint vertexIdx = 
-                        X * verticesPerExecution +
-                Z * width * verticesPerExecution +
-        Y * width * width * verticesPerExecution
+    uint vertexIdx =
+                                                            X * verticesPerExecution +
+                               Z * params.dimensions.z * verticesPerExecution +
+        Y * params.dimensions.x * params.dimensions.z * verticesPerExecution
     ;
     int triangleList[16] = caseIdxToTriangleList[caseIdx];
     for (uint triangleIdx = 0; triangleIdx < verticesPerExecution / 3; triangleIdx++) {

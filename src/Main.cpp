@@ -12,9 +12,6 @@ struct Vertex {
     Vec4 position;
     Vec4 normal;
 };
-struct Params {
-    Vec4 baseOffset;
-};
 struct Uniforms {
     float proj[16];
     float ortho[16];

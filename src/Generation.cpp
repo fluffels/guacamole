@@ -1,5 +1,12 @@
 #include <queue>
 
+#pragma pack(push, 1)
+struct Params {
+    Vec4 baseOffset;
+    Vec4i dimensions;
+};
+#pragma pack(pop)
+
 struct Chunk {
     Vec3i coord;
     VulkanBuffer computeBuffer;
@@ -95,6 +102,12 @@ void chunkTriangulate(Vulkan& vk, Chunk& chunk) {
                 chunk.coord.x * (float)computeWidth,
                 chunk.coord.y * (float)computeHeight,
                 chunk.coord.z * (float)computeDepth,
+                0
+            },
+            {
+                computeWidth,
+                computeHeight,
+                computeDepth,
                 0
             }
         };
