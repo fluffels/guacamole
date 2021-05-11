@@ -129,15 +129,34 @@ void chunkPack(
     Chunk& chunk
 ) {
     START_TIMER(Pack);
+
+    u32 vertexCount = 0;
+    {
+        auto src = (Vertex*)mapMemory(vk.device, chunk.computeBuffer.memory);
+        for (int i = 0; i < computeCount; i++) {
+            for (int j = 0; j < computeVerticesPerExecution; j++) {
+                if ((src->position.x == 0.f) &&
+                        (src->position.y == 0.f) &&
+                        (src->position.z == 0.f)) {
+                    src += computeVerticesPerExecution - j;
+                    break;
+                } else {
+                    vertexCount++;
+                    src++;
+                }
+            }
+        }
+        unMapMemory(vk.device, chunk.computeBuffer.memory);
+    }
+
     createVertexBuffer(
         vk.device,
         vk.memories,
         vk.queueFamily,
-        computeSize, //TODO: this is way too big
+        vertexCount * sizeof(Vertex),
         chunk.vertexBuffer
     );
 
-    u32 vertexCount = 0;
     {
         auto src = (Vertex*)mapMemory(vk.device, chunk.computeBuffer.memory);
         auto dst = (Vertex*)mapMemory(vk.device, chunk.vertexBuffer.memory);
@@ -151,7 +170,6 @@ void chunkPack(
                 } else {
                     *dst = *src;
                     dst++;
-                    vertexCount++;
                     src++;
                 }
             }
