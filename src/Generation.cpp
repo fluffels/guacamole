@@ -141,15 +141,20 @@ void chunkPack(
     {
         auto src = (Vertex*)mapMemory(vk.device, chunk.computeBuffer.memory);
         auto dst = (Vertex*)mapMemory(vk.device, chunk.vertexBuffer.memory);
-        for (int it = 0; it < computeVertexCount; it++) {
-            if ((src->position.x != 0.f) ||
-                (src->position.y != 0.f) ||
-                (src->position.z != 0.f)) {
-                *dst = *src;
-                dst++;
-                vertexCount++;
+        for (int i = 0; i < computeCount; i++) {
+            for (int j = 0; j < computeVerticesPerExecution; j++) {
+                if ((src->position.x == 0.f) &&
+                        (src->position.y == 0.f) &&
+                        (src->position.z == 0.f)) {
+                    src += computeVerticesPerExecution - j;
+                    break;
+                } else {
+                    *dst = *src;
+                    dst++;
+                    vertexCount++;
+                    src++;
+                }
             }
-            src++;
         }
         unMapMemory(vk.device, chunk.computeBuffer.memory);
         unMapMemory(vk.device, chunk.vertexBuffer.memory);
