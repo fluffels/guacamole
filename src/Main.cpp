@@ -322,6 +322,8 @@ WinMain(
         }
 
         // Render.
+        auto drawCallCount = 0;
+        auto drawnVertexCount = 0;
         VkCommandBuffer cmd;
         {
             createCommandBuffers(vk.device, vk.cmdPool, 1, &cmd);
@@ -361,6 +363,8 @@ WinMain(
             for (u32 chunkIdx = 0; chunkIdx < nextChunkIdx; chunkIdx++) {
                 auto& chunk = chunks[chunkIdx];
                 if (chunk.vertexCount) {
+                    drawCallCount++;
+                    drawnVertexCount += chunk.vertexCount;
                     vkCmdBindVertexBuffers(
                         cmd,
                         0, 1,
@@ -387,6 +391,10 @@ WinMain(
             display(
                 "%dx %dy %dz (%d chunks)",
                 currentChunkCoord.x, currentChunkCoord.y, currentChunkCoord.z, nextChunkIdx
+            );
+            display(
+                "%d vertices in %d calls",
+                drawnVertexCount, drawCallCount
             );
             display(
                 "%.4fx %.4fy %.4fz %.4fw",
