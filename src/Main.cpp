@@ -363,6 +363,29 @@ WinMain(
             for (u32 chunkIdx = 0; chunkIdx < nextChunkIdx; chunkIdx++) {
                 auto& chunk = chunks[chunkIdx];
                 if (chunk.vertexCount) {
+                    Vec3 corners[8] = {
+                        { chunk.min.x, chunk.min.y, chunk.min.z },
+                        { chunk.min.x, chunk.min.y, chunk.max.z },
+                        { chunk.min.x, chunk.max.y, chunk.min.z },
+                        { chunk.min.x, chunk.max.y, chunk.max.z },
+                        { chunk.max.x, chunk.min.y, chunk.min.z },
+                        { chunk.max.x, chunk.min.y, chunk.max.z },
+                        { chunk.max.x, chunk.max.y, chunk.min.z },
+                        { chunk.max.x, chunk.max.y, chunk.max.z }
+                    };
+                    Vec3 eye = { -uniforms.eye.x, -uniforms.eye.y, -uniforms.eye.z };
+                    bool insideViewFrustum = false;
+                    for (auto& corner: corners) {
+                        vectorAdd(corner, eye, corner);
+                        rotatePoint(uniforms.rotation, corner, corner);
+                        matrixMultiplyPoint(uniforms.proj, corner, corner);
+                        if (corner.z >= 0) {
+                            insideViewFrustum = true;
+                            break;
+                        }
+                    }
+                    if (!insideViewFrustum) continue;
+
                     drawCallCount++;
                     drawnVertexCount += chunk.vertexCount;
                     vkCmdBindVertexBuffers(

@@ -12,6 +12,8 @@ struct Chunk {
     VulkanBuffer computeBuffer;
     VulkanBuffer vertexBuffer;
     u32 vertexCount;
+    Vec3 min;
+    Vec3 max;
 };
 
 struct GenerateWorkItem {
@@ -130,9 +132,14 @@ void chunkPack(
 ) {
     START_TIMER(Pack);
 
+    auto computedVertices = (Vertex*)mapMemory(vk.device, chunk.computeBuffer.memory);
+
+    chunk.min = {  INFINITY,  INFINITY,  INFINITY };
+    chunk.max = { -INFINITY, -INFINITY, -INFINITY };
+
     u32 vertexCount = 0;
     {
-        auto src = (Vertex*)mapMemory(vk.device, chunk.computeBuffer.memory);
+        auto src = computedVertices;
         for (int i = 0; i < computeCount; i++) {
             for (int j = 0; j < computeVerticesPerExecution; j++) {
                 if ((src->position.x == 0.f) &&
@@ -143,10 +150,15 @@ void chunkPack(
                 } else {
                     vertexCount++;
                     src++;
+                    if (src->position.x < chunk.min.x) chunk.min.x = src->position.x;
+                    if (src->position.y < chunk.min.y) chunk.min.y = src->position.y;
+                    if (src->position.z < chunk.min.z) chunk.min.z = src->position.z;
+                    if (src->position.x > chunk.max.x) chunk.max.x = src->position.x;
+                    if (src->position.y > chunk.max.y) chunk.max.y = src->position.y;
+                    if (src->position.z > chunk.max.z) chunk.max.z = src->position.z;
                 }
             }
         }
-        unMapMemory(vk.device, chunk.computeBuffer.memory);
     }
 
     createVertexBuffer(
@@ -158,7 +170,7 @@ void chunkPack(
     );
 
     {
-        auto src = (Vertex*)mapMemory(vk.device, chunk.computeBuffer.memory);
+        auto src = computedVertices;
         auto dst = (Vertex*)mapMemory(vk.device, chunk.vertexBuffer.memory);
         for (int i = 0; i < computeCount; i++) {
             for (int j = 0; j < computeVerticesPerExecution; j++) {
