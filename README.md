@@ -17,8 +17,8 @@ Each available chunk is then rendered in turn.
 - ✅ Marching cubes compute shader
 - ✅ Threaded geometry generation
 - ✅ Frame timing output
+- ✅ Fix crash that occurs after ~100 chunks (this is probably an out of memory error)
 - 🔲 Performance counters on GPU to get more fine grained perf data
-- 🔲 Fix crash that occurs after ~100 chunks (this is probably an out of memory error)
 - 🔲 Implement some form of culling, currently FPS decreases with each chunk generated
 - 🔲 Improve frame times during chunk generation
 - 🔲 Improve pack times, right now it is a very dumb linear scan.
