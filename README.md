@@ -26,6 +26,7 @@ Each available chunk is then rendered in turn.
 - 🔲 Smooth out marching cubes by properly interpolating instead of just taking the halfway point.
 - 🔲 Use `meshoptimizer` to further optimize meshes.
 - 🔲 Smooth out marching cubes by calculating smoothed normals.
+- 🔲 Vectorize parts we can.
 
 ## Discussion
 
