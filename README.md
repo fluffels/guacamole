@@ -18,15 +18,26 @@ Each available chunk is then rendered in turn.
 - ✅ Threaded geometry generation
 - ✅ Frame timing output
 - ✅ Fix crash that occurs after ~100 chunks (this is probably an out of memory error)
-- 🔲 Performance counters on GPU to get more fine grained perf data
-- 🔲 Implement some form of culling, currently FPS decreases with each chunk generated
-- 🔲 Improve frame times during chunk generation
-- 🔲 Improve pack times, right now it is a very dumb linear scan.
+- ✅ Improve frame times during chunk generation
+- ✅ Improve pack times, right now it is a very dumb linear scan.
+- ✅ Implement some form of culling, currently FPS decreases with each chunk generated
+- 🔲 Improve culling, currently only culled on X-axis and Z-axis.
+- 🔲 Add a max draw distance, chunk very far away probably aren't adding much.
+- 🔲 Performance counters on GPU to get better perf data
 - 🔲 Use a thread pool for the short lived threads to cut down on overhead.
 - 🔲 Smooth out marching cubes by properly interpolating instead of just taking the halfway point.
 - 🔲 Use `meshoptimizer` to further optimize meshes.
 - 🔲 Smooth out marching cubes by calculating smoothed normals.
 - 🔲 Vectorize parts we can.
+- 🔲 Allow "infinite" world growth.
+
+## Dev Log
+
+### 2021-05-16
+Added some more basic frustum culling.
+Through experimenting with this it became obvious that frame rate spikes are due concurrent compute shader and GFX load.
+If the number of vertices being rendered is kept constant through culling, the frame times don't exceed 16ms even when computing new geometry.
+Frame rates never dip below 8ms for some reason though, likely related to `vkQueueWaitIdle` or something else to do with the swap chain.
 
 ## Discussion
 
