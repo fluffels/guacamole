@@ -457,7 +457,7 @@ WinMain(
         presentInfo.pWaitSemaphores = &vk.swap.cmdBufferDone;
         presentInfo.pImageIndices = &swapImageIndex;
         VKCHECK(vkQueuePresentKHR(vk.queue, &presentInfo));
-        vkDeviceWaitIdle(vk.device); //@perf
+        vkQueueWaitIdle(vk.queue); //@perf
 
         vkFreeCommandBuffers(
             vk.device,
