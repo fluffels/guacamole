@@ -204,6 +204,7 @@ WinMain(
     float rotY = 0;
     float rotX = 0;
     Uniforms uniforms = {};
+    quaternionInit(uniforms.rotation);
     matrixProjection(
         screenWidth,
         screenHeight,
