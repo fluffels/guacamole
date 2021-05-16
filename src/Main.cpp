@@ -376,13 +376,28 @@ WinMain(
                     };
                     Vec3 eye = { -uniforms.eye.x, -uniforms.eye.y, -uniforms.eye.z };
                     bool insideViewFrustum = false;
+                    float minX = INFINITY;
+                    float maxX = -INFINITY;
                     for (auto& corner: corners) {
                         vectorAdd(corner, eye, corner);
                         rotatePoint(uniforms.rotation, corner, corner);
-                        matrixMultiplyPoint(uniforms.proj, corner, corner);
-                        if (corner.z >= 0) {
+                        Vec4 r = {};
+                        matrixMultiplyPoint(uniforms.proj, corner, r);
+                        if (r.z >= 0) {
                             insideViewFrustum = true;
-                            break;
+                        }
+                        float x = r.x / r.w;
+                        minX = fmin(minX, x);
+                        maxX = fmax(maxX, x);
+                    }
+                    if (!insideViewFrustum) continue;
+                    else {
+                        if ((minX < -1) && (maxX < -1)) {
+                            insideViewFrustum = false;
+                        } else if ((minX > 1) && (maxX > 1)) {
+                            insideViewFrustum = false;
+                        } else {
+                            insideViewFrustum = true;
                         }
                     }
                     if (!insideViewFrustum) continue;
