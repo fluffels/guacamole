@@ -22,7 +22,7 @@ Each available chunk is then rendered in turn.
 - ✅ Improve pack times, right now it is a very dumb linear scan.
 - ✅ Implement some form of culling, currently FPS decreases with each chunk generated
 - ✅ Improve culling, currently only culled on X-axis and Z-axis.
-- 🔲  Improve culling, currently kinda jank.
+- 🔲 Improve culling, currently kinda jank.
 - 🔲 Add a max draw distance, chunk very far away probably aren't adding much.
 - 🔲 Performance counters on GPU to get better perf data
 - 🔲 Use a thread pool for the short lived threads to cut down on overhead.
