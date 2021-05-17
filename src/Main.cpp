@@ -378,6 +378,8 @@ WinMain(
                     bool insideViewFrustum = false;
                     float minX = INFINITY;
                     float maxX = -INFINITY;
+                    float minY = INFINITY;
+                    float maxY = -INFINITY;
                     for (auto& corner: corners) {
                         vectorAdd(corner, eye, corner);
                         rotatePoint(uniforms.rotation, corner, corner);
@@ -387,14 +389,21 @@ WinMain(
                             insideViewFrustum = true;
                         }
                         float x = r.x / r.w;
+                        float y = r.y / r.w;
                         minX = fmin(minX, x);
                         maxX = fmax(maxX, x);
+                        minY = fmin(minY, y);
+                        maxY = fmax(maxY, y);
                     }
                     if (!insideViewFrustum) continue;
                     else {
                         if ((minX < -1) && (maxX < -1)) {
                             insideViewFrustum = false;
                         } else if ((minX > 1) && (maxX > 1)) {
+                            insideViewFrustum = false;
+                        } else if ((minY < -1) && (maxY < -1)) {
+                            insideViewFrustum = false;
+                        } else if ((minY > 1) && (maxY > 1)) {
                             insideViewFrustum = false;
                         } else {
                             insideViewFrustum = true;
@@ -514,6 +523,12 @@ WinMain(
         }
         if (keyboard['D']) {
             movePerpendicularToQuaternion(moveDelta, uniforms.rotation, uniforms.eye);
+        }
+        if (keyboard[VK_SPACE]) {
+            uniforms.eye.y -= moveDelta;
+        }
+        if (keyboard[VK_SHIFT]) {
+            uniforms.eye.y += moveDelta;
         }
 
         updateUniforms(vk, &uniforms, sizeof(uniforms));
