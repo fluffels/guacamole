@@ -13,6 +13,9 @@ Each available chunk is then rendered in turn.
 ## Progress Screenshot
 ![](screenshot.png)
 
+## Demo
+https://github.com/user-attachments/assets/2526eee1-f648-4aa4-9b0d-e2c7a90b5b4c
+
 ## TODO
 - ✅ Marching cubes compute shader
 - ✅ Threaded geometry generation
